@@ -114,11 +114,11 @@ function DashboardPage() {
                   habit={habit}
                   onToggle={() => handleToggle(habit.id)}
                   onUpdate={async (updates) => {
-                    await doUpdate({ habitId: habit.id, ...updates });
+                    await updateHabit({ habitId: habit.id, ...updates });
                     queryClient.invalidateQueries({ queryKey: ["habits", date] });
                   }}
                   onDelete={async () => {
-                    await doDelete({ habitId: habit.id });
+                    await deleteHabit({ habitId: habit.id });
                     queryClient.invalidateQueries({ queryKey: ["habits", date] });
                     queryClient.invalidateQueries({ queryKey: ["stats", date] });
                     queryClient.invalidateQueries({ queryKey: ["weekly", date] });
