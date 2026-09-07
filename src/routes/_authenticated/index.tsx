@@ -38,17 +38,17 @@ function DashboardPage() {
 
   const { data: habits, isPending: habitsPending } = useQuery({
     queryKey: ["habits", date],
-    queryFn: () => getHabitsForDate({ date }),
+    queryFn: () => getHabitsForDate({ data: { date } }),
   });
 
   const { data: stats, isPending: statsPending } = useQuery({
     queryKey: ["stats", date],
-    queryFn: () => getStats({ date }),
+    queryFn: () => getStats({ data: { date } }),
   });
 
   const { data: weekly, isPending: weeklyPending } = useQuery({
     queryKey: ["weekly", date],
-    queryFn: () => getWeeklyProgress({ date }),
+    queryFn: () => getWeeklyProgress({ data: { date } }),
   });
 
   const completedCount = habits?.filter((h) => h.completed).length ?? 0;
@@ -57,7 +57,7 @@ function DashboardPage() {
 
   const handleToggle = async (habitId: string) => {
     try {
-      await toggleCompletion({ habitId, date });
+      await toggleCompletion({ data: { habitId, date } });
       queryClient.invalidateQueries({ queryKey: ["habits", date] });
       queryClient.invalidateQueries({ queryKey: ["stats", date] });
       queryClient.invalidateQueries({ queryKey: ["weekly", date] });
@@ -114,11 +114,11 @@ function DashboardPage() {
                   habit={habit}
                   onToggle={() => handleToggle(habit.id)}
                   onUpdate={async (updates) => {
-                    await updateHabit({ habitId: habit.id, ...updates });
+                    await updateHabit({ data: { habitId: habit.id, ...updates } });
                     queryClient.invalidateQueries({ queryKey: ["habits", date] });
                   }}
                   onDelete={async () => {
-                    await deleteHabit({ habitId: habit.id });
+                    await deleteHabit({ data: { habitId: habit.id } });
                     queryClient.invalidateQueries({ queryKey: ["habits", date] });
                     queryClient.invalidateQueries({ queryKey: ["stats", date] });
                     queryClient.invalidateQueries({ queryKey: ["weekly", date] });
@@ -146,7 +146,7 @@ function DashboardPage() {
         <AddHabitModal
           onClose={() => setIsAdding(false)}
           onCreate={async (values) => {
-            await createHabit(values);
+            await createHabit({ data: values });
             queryClient.invalidateQueries({ queryKey: ["habits", date] });
             queryClient.invalidateQueries({ queryKey: ["stats", date] });
             queryClient.invalidateQueries({ queryKey: ["weekly", date] });

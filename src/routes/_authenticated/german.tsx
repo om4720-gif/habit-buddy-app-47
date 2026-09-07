@@ -20,7 +20,7 @@ function GermanPage() {
 
   const { data: habits = [] } = useQuery({
     queryKey: ["habits", today, "german"],
-    queryFn: () => getHabitsForDate({ date: today, category: "german" }),
+    queryFn: () => getHabitsForDate({ data: { date: today, category: "german" } }),
   });
 
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -32,7 +32,7 @@ function GermanPage() {
 
   async function handleToggle(habitId: string) {
     try {
-      await toggleCompletion({ habitId, date: today });
+      await toggleCompletion({ data: { habitId, date: today } });
       queryClient.invalidateQueries({ queryKey: ["habits", today, "german"] });
       toast.success("Progress saved");
     } catch (err) {
@@ -141,7 +141,7 @@ function GermanPage() {
         onOpenChange={setIsAddOpen}
         defaultCategory="german"
         onCreate={async (values) => {
-          await createHabit(values);
+          await createHabit({ data: values });
           queryClient.invalidateQueries({ queryKey: ["habits", today, "german"] });
           setIsAddOpen(false);
           toast.success("Habit created");
