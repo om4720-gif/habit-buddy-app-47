@@ -13,17 +13,22 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const getHabitsForDate = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .validator((data) => z.object({ date: dateSchema }).parse(data))
+  .validator((data) =>
+    z.object({ date: dateSchema, category: z.enum(["general", "german", "uni"]).optional() }).parse(data)
+  )
   .handler(async ({ data, context }) => {
-    const { date } = data;
+    const { date, category } = data;
     const { supabase, userId } = context;
 
-    const { data: habits, error: habitsError } = await supabase
+    let query = supabase
       .from("habits")
       .select("id, name, description, category, created_at")
       .eq("user_id", userId)
-      .eq("archived", false)
-      .order("created_at", { ascending: true });
+      .eq("archived", false);
+    if (category) {
+      query = query.eq("category", category);
+    }
+    const { data: habits, error: habitsError } = await query.order("created_at", { ascending: true });
 
     if (habitsError) throw new Error(habitsError.message);
 
