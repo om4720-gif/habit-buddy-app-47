@@ -38,17 +38,17 @@ function DashboardPage() {
 
   const { data: habits, isPending: habitsPending } = useQuery({
     queryKey: ["habits", date],
-    queryFn: () => fetchHabits({ date }),
+    queryFn: () => getHabitsForDate({ date }),
   });
 
   const { data: stats, isPending: statsPending } = useQuery({
     queryKey: ["stats", date],
-    queryFn: () => fetchStats({ date }),
+    queryFn: () => getStats({ date }),
   });
 
   const { data: weekly, isPending: weeklyPending } = useQuery({
     queryKey: ["weekly", date],
-    queryFn: () => fetchWeekly({ date }),
+    queryFn: () => getWeeklyProgress({ date }),
   });
 
   const completedCount = habits?.filter((h) => h.completed).length ?? 0;
