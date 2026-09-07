@@ -3,10 +3,9 @@ import { format } from "date-fns";
 import { BookOpen, Check, Flame, Plus } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
-import { getHabitsForDate, toggleCompletion } from "@/lib/habits.functions";
+import { createHabit, getHabitsForDate, toggleCompletion } from "@/lib/habits.functions";
 import { AddHabitModal } from "@/components/AddHabitModal";
 import { Button } from "@/components/ui/button";
 
