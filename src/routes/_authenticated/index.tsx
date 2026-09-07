@@ -146,7 +146,7 @@ function DashboardPage() {
         <AddHabitModal
           onClose={() => setIsAdding(false)}
           onCreate={async (values) => {
-            await doCreate(values);
+            await createHabit(values);
             queryClient.invalidateQueries({ queryKey: ["habits", date] });
             queryClient.invalidateQueries({ queryKey: ["stats", date] });
             queryClient.invalidateQueries({ queryKey: ["weekly", date] });
