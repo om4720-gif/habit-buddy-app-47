@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import type { Database } from "@/integrations/supabase/types";
+
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const getCourses = createServerFn({ method: "GET" })
@@ -54,12 +56,12 @@ export const updateCourse = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { courseId } = data;
-    const updates: Record<string, unknown> = {
+    const updates: Database["public"]["Tables"]["courses"]["Update"] = {
       updated_at: new Date().toISOString(),
     };
-    if (data.name !== undefined) updates["name"] = data.name;
-    if (data.code !== undefined) updates["code"] = data.code;
-    if (data.color !== undefined) updates["color"] = data.color;
+    if (data.name !== undefined) updates.name = data.name;
+    if (data.code !== undefined) updates.code = data.code;
+    if (data.color !== undefined) updates.color = data.color;
     const { error } = await supabase
       .from("courses")
       .update(updates)
@@ -141,12 +143,12 @@ export const updateLecture = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { lectureId } = data;
-    const updates: Record<string, unknown> = {
+    const updates: Database["public"]["Tables"]["lectures"]["Update"] = {
       updated_at: new Date().toISOString(),
     };
-    if (data.title !== undefined) updates["title"] = data.title;
-    if (data.lectureDate !== undefined) updates["lecture_date"] = data.lectureDate;
-    if (data.completed !== undefined) updates["completed"] = data.completed;
+    if (data.title !== undefined) updates.title = data.title;
+    if (data.lectureDate !== undefined) updates.lecture_date = data.lectureDate;
+    if (data.completed !== undefined) updates.completed = data.completed;
     const { error } = await supabase
       .from("lectures")
       .update(updates)

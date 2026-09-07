@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import type { Database } from "@/integrations/supabase/types";
+
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   computeConsistencyRate,
@@ -143,12 +145,12 @@ export const updateHabit = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { habitId } = data;
 
-    const updates: Record<string, unknown> = {
+    const updates: Database["public"]["Tables"]["habits"]["Update"] = {
       updated_at: new Date().toISOString(),
     };
-    if (data.name !== undefined) updates["name"] = data.name;
-    if (data.description !== undefined) updates["description"] = data.description;
-    if (data.archived !== undefined) updates["archived"] = data.archived;
+    if (data.name !== undefined) updates.name = data.name;
+    if (data.description !== undefined) updates.description = data.description;
+    if (data.archived !== undefined) updates.archived = data.archived;
 
     const { error } = await supabase
       .from("habits")
