@@ -17,12 +17,10 @@ const today = format(new Date(), "yyyy-MM-dd");
 
 function GermanPage() {
   const queryClient = useQueryClient();
-  const fetchHabits = useServerFn(getHabitsForDate);
-  const toggleHabit = useServerFn(toggleCompletion);
 
   const { data: habits = [] } = useQuery({
     queryKey: ["habits", today, "german"],
-    queryFn: () => fetchHabits({ date: today, category: "german" }),
+    queryFn: () => getHabitsForDate({ date: today, category: "german" }),
   });
 
   const [isAddOpen, setIsAddOpen] = useState(false);
