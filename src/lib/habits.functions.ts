@@ -13,7 +13,7 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const getHabitsForDate = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ date: dateSchema }).parse(data))
+  .validator((data) => z.object({ date: dateSchema }).parse(data))
   .handler(async ({ data, context }) => {
     const { date } = data;
     const { supabase, userId } = context;
@@ -66,7 +66,7 @@ export const getHabitsForDate = createServerFn({ method: "GET" })
 
 export const toggleCompletion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z.object({ habitId: z.string().uuid(), date: dateSchema }).parse(data)
   )
   .handler(async ({ data, context }) => {
@@ -101,7 +101,7 @@ export const toggleCompletion = createServerFn({ method: "POST" })
 
 export const createHabit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({
         name: z.string().min(1).max(200),
@@ -124,7 +124,7 @@ export const createHabit = createServerFn({ method: "POST" })
 
 export const updateHabit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z
       .object({
         habitId: z.string().uuid(),
@@ -153,7 +153,7 @@ export const updateHabit = createServerFn({ method: "POST" })
 
 export const deleteHabit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ habitId: z.string().uuid() }).parse(data))
+  .validator((data) => z.object({ habitId: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { error } = await supabase
@@ -167,7 +167,7 @@ export const deleteHabit = createServerFn({ method: "POST" })
 
 export const getStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ date: dateSchema }).parse(data))
+  .validator((data) => z.object({ date: dateSchema }).parse(data))
   .handler(async ({ data, context }) => {
     const { date } = data;
     const { supabase, userId } = context;
@@ -232,7 +232,7 @@ export const getStats = createServerFn({ method: "GET" })
 
 export const getWeeklyProgress = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ date: dateSchema }).parse(data))
+  .validator((data) => z.object({ date: dateSchema }).parse(data))
   .handler(async ({ data, context }) => {
     const { date } = data;
     const { supabase, userId } = context;
