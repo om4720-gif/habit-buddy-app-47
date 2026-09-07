@@ -382,10 +382,10 @@ function WeeklyProgress({
   isPending: boolean;
 }) {
   const completionRate =
-    days.length > 0 && days[0].total > 0
+    days.length > 0 && days[0]!.total > 0
       ? Math.round(
           (days.reduce((acc, d) => acc + d.completed, 0) /
-            (days[0].total * days.length)) *
+            (days[0]!.total * days.length)) *
             100
         )
       : 0;

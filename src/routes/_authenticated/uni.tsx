@@ -352,7 +352,7 @@ function UniPage() {
               >
                 <div className="flex items-start gap-3">
                   <button
-                    onClick={() => toggleLecture(lecture.id, lecture.completed)}
+                    onClick={() => toggleLecture(lecture.id, !!lecture.completed)}
                     className={`mt-0.5 size-6 rounded-full border-2 transition ${
                       lecture.completed
                         ? "border-rust bg-rust text-cream"
