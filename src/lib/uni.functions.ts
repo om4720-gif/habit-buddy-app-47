@@ -53,10 +53,16 @@ export const updateCourse = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { courseId, ...updates } = data;
+    const { courseId } = data;
+    const updates: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (data.name !== undefined) updates["name"] = data.name;
+    if (data.code !== undefined) updates["code"] = data.code;
+    if (data.color !== undefined) updates["color"] = data.color;
     const { error } = await supabase
       .from("courses")
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq("id", courseId)
       .eq("user_id", userId);
     if (error) throw new Error(error.message);
@@ -134,10 +140,16 @@ export const updateLecture = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { lectureId, ...updates } = data;
+    const { lectureId } = data;
+    const updates: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (data.title !== undefined) updates["title"] = data.title;
+    if (data.lectureDate !== undefined) updates["lecture_date"] = data.lectureDate;
+    if (data.completed !== undefined) updates["completed"] = data.completed;
     const { error } = await supabase
       .from("lectures")
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq("id", lectureId)
       .eq("user_id", userId);
     if (error) throw new Error(error.message);
