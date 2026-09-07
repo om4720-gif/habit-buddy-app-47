@@ -32,7 +32,7 @@ function GermanPage() {
 
   async function handleToggle(habitId: string) {
     try {
-      await toggleHabit({ habitId, date: today });
+      await toggleCompletion({ habitId, date: today });
       queryClient.invalidateQueries({ queryKey: ["habits", today, "german"] });
       toast.success("Progress saved");
     } catch (err) {
