@@ -15,15 +15,15 @@ export function computeStreak(completionDates: string[], referenceDate: string):
   if (sorted.length === 0) return 0;
 
   const ref = parseISO(referenceDate);
-  const mostRecent = parseISO(sorted[0]);
+  const mostRecent = parseISO(sorted[0]!);
 
   // Streak is broken if the most recent completion is before yesterday.
   if (isBefore(mostRecent, subDays(ref, 1))) return 0;
 
   let streak = 1;
   for (let i = 1; i < sorted.length; i++) {
-    const prev = parseISO(sorted[i - 1]);
-    const curr = parseISO(sorted[i]);
+    const prev = parseISO(sorted[i - 1]!);
+    const curr = parseISO(sorted[i]!);
     if (format(subDays(prev, 1), "yyyy-MM-dd") === format(curr, "yyyy-MM-dd")) {
       streak++;
     } else {
@@ -40,8 +40,8 @@ export function computeLongestStreak(completionDates: string[]): number {
   let current = 1;
 
   for (let i = 1; i < sorted.length; i++) {
-    const prev = parseISO(sorted[i - 1]);
-    const curr = parseISO(sorted[i]);
+    const prev = parseISO(sorted[i - 1]!);
+    const curr = parseISO(sorted[i]!);
     if (format(subDays(curr, 1), "yyyy-MM-dd") === format(prev, "yyyy-MM-dd")) {
       current++;
       longest = Math.max(longest, current);
