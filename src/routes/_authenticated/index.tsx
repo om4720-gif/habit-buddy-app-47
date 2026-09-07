@@ -57,7 +57,7 @@ function DashboardPage() {
 
   const handleToggle = async (habitId: string) => {
     try {
-      await toggle({ habitId, date });
+      await toggleCompletion({ habitId, date });
       queryClient.invalidateQueries({ queryKey: ["habits", date] });
       queryClient.invalidateQueries({ queryKey: ["stats", date] });
       queryClient.invalidateQueries({ queryKey: ["weekly", date] });
