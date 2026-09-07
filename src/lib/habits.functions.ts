@@ -13,7 +13,7 @@ import {
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-export const getHabitsForDate = createServerFn({ method: "GET" })
+export const getHabitsForDate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) =>
     z.object({ date: dateSchema, category: z.enum(["general", "german", "uni"]).optional() }).parse(data)
@@ -176,7 +176,7 @@ export const deleteHabit = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-export const getStats = createServerFn({ method: "GET" })
+export const getStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ date: dateSchema }).parse(data))
   .handler(async ({ data, context }) => {
@@ -241,7 +241,7 @@ export const getStats = createServerFn({ method: "GET" })
     };
   });
 
-export const getWeeklyProgress = createServerFn({ method: "GET" })
+export const getWeeklyProgress = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ date: dateSchema }).parse(data))
   .handler(async ({ data, context }) => {

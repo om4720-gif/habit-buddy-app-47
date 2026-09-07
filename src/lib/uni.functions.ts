@@ -5,7 +5,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export const getCourses = createServerFn({ method: "GET" })
+export const getCourses = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
@@ -85,7 +85,7 @@ export const deleteCourse = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-export const getLectures = createServerFn({ method: "GET" })
+export const getLectures = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) =>
     z.object({ courseId: z.string().uuid().optional() }).parse(data)
