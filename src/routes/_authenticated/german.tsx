@@ -140,6 +140,12 @@ function GermanPage() {
         open={isAddOpen}
         onOpenChange={setIsAddOpen}
         defaultCategory="german"
+        onCreate={async (values) => {
+          await createHabit(values);
+          queryClient.invalidateQueries({ queryKey: ["habits", today, "german"] });
+          setIsAddOpen(false);
+          toast.success("Habit created");
+        }}
       />
     </main>
   );
