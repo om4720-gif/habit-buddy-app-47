@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import type { Database } from "@/integrations/supabase/types";
+
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   computeConsistencyRate,
@@ -60,8 +62,8 @@ export const getHabitsForDate = createServerFn({ method: "GET" })
         id: h.id,
         name: h.name,
         description: h.description,
-        category: h.category,
-        created_at: h.created_at,
+        category: h.category ?? "general",
+        created_at: h.created_at ?? "",
         completed: todayCompleted.has(h.id),
         streak: computeStreak(completionsByHabit.get(h.id) ?? [], date),
       })) ?? [];
@@ -141,14 +143,18 @@ export const updateHabit = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { habitId, ...updates } = data;
+    const { habitId } = data;
+
+    const updates: Database["public"]["Tables"]["habits"]["Update"] = {
+      updated_at: new Date().toISOString(),
+    };
+    if (data.name !== undefined) updates.name = data.name;
+    if (data.description !== undefined) updates.description = data.description;
+    if (data.archived !== undefined) updates.archived = data.archived;
 
     const { error } = await supabase
       .from("habits")
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq("id", habitId)
       .eq("user_id", userId);
 

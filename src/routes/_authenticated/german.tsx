@@ -25,7 +25,7 @@ function GermanPage() {
 
   const [isAddOpen, setIsAddOpen] = useState(false);
 
-  const completedToday = habits.filter((h) => h.completedToday).length;
+  const completedToday = habits.filter((h) => h.completed).length;
   const total = habits.length || 1;
   const progress = Math.round((completedToday / total) * 100);
   const streak = habits.reduce((max, h) => Math.max(max, h.streak), 0);
@@ -123,13 +123,13 @@ function GermanPage() {
               <button
                 onClick={() => handleToggle(habit.id)}
                 className={`stamp-check size-10 rounded-full border-2 transition ${
-                  habit.completedToday
+                  habit.completed
                     ? "border-rust bg-rust text-cream"
                     : "border-line bg-transparent text-ink-soft hover:border-rust/40"
                 }`}
-                aria-label={habit.completedToday ? "Mark incomplete" : "Mark complete"}
+                aria-label={habit.completed ? "Mark incomplete" : "Mark complete"}
               >
-                {habit.completedToday && <Check className="size-5" />}
+                {habit.completed && <Check className="size-5" />}
               </button>
             </div>
           ))}
