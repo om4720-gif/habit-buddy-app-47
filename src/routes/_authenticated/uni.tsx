@@ -53,7 +53,7 @@ function UniPage() {
 
   const { data: lectures = [] } = useQuery({
     queryKey: ["lectures"],
-    queryFn: () => fetchLectures({}),
+    queryFn: () => fetchLectures({ data: {} }),
   });
 
   const [selectedCourse, setSelectedCourse] = useState<string | "all">("all");
@@ -75,8 +75,7 @@ function UniPage() {
     e.preventDefault();
     try {
       await createCourseFn({
-        name: courseForm.name,
-        code: courseForm.code || undefined,
+        data: { name: courseForm.name, code: courseForm.code || undefined },
       });
       setCourseForm({ name: "", code: "" });
       setCourseDialogOpen(false);
@@ -91,9 +90,11 @@ function UniPage() {
     e.preventDefault();
     try {
       await createLectureFn({
-        courseId: lectureForm.courseId,
-        title: lectureForm.title,
-        lectureDate: lectureForm.date,
+        data: {
+          courseId: lectureForm.courseId,
+          title: lectureForm.title,
+          lectureDate: lectureForm.date,
+        },
       });
       setLectureForm({
         courseId: courses[0]?.id ?? "",
@@ -110,7 +111,7 @@ function UniPage() {
 
   async function toggleLecture(lectureId: string, completed: boolean) {
     try {
-      await updateLectureFn({ lectureId, completed: !completed });
+      await updateLectureFn({ data: { lectureId, completed: !completed } });
       queryClient.invalidateQueries({ queryKey: ["lectures"] });
     } catch (err) {
       toast.error("Could not update lecture");
@@ -119,7 +120,7 @@ function UniPage() {
 
   async function removeCourse(courseId: string) {
     try {
-      await deleteCourseFn({ courseId });
+      await deleteCourseFn({ data: { courseId } });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["lectures"] });
       toast.success("Course removed");
@@ -130,7 +131,7 @@ function UniPage() {
 
   async function removeLecture(lectureId: string) {
     try {
-      await deleteLectureFn({ lectureId });
+      await deleteLectureFn({ data: { lectureId } });
       queryClient.invalidateQueries({ queryKey: ["lectures"] });
       toast.success("Lecture removed");
     } catch (err) {
