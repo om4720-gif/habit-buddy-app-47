@@ -36,14 +36,6 @@ function DashboardPage() {
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
 
-  const fetchHabits = useServerFn(getHabitsForDate);
-  const fetchStats = useServerFn(getStats);
-  const fetchWeekly = useServerFn(getWeeklyProgress);
-  const toggle = useServerFn(toggleCompletion);
-  const doCreate = useServerFn(createHabit);
-  const doUpdate = useServerFn(updateHabit);
-  const doDelete = useServerFn(deleteHabit);
-
   const { data: habits, isPending: habitsPending } = useQuery({
     queryKey: ["habits", date],
     queryFn: () => fetchHabits({ date }),
