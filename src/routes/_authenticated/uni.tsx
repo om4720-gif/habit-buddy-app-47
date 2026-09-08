@@ -157,7 +157,7 @@ function UniPage() {
           Course tracker
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
-          Keep up with lectures and attendance across your classes.
+          Keep track of which lectures you have studied and finished.
         </p>
       </header>
 
@@ -176,7 +176,7 @@ function UniPage() {
         </div>
         <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
           <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
-            Attendance
+            Studied
           </p>
           <p className="mt-1 font-display text-2xl text-ink">{completionRate}%</p>
         </div>
@@ -358,7 +358,7 @@ function UniPage() {
                         ? "border-rust bg-rust text-cream"
                         : "border-line bg-transparent text-ink-soft hover:border-rust/40"
                     }`}
-                    aria-label={lecture.completed ? "Mark absent" : "Mark attended"}
+                    aria-label={lecture.completed ? "Mark not studied" : "Mark studied"}
                   >
                     {lecture.completed && <Check className="size-4" />}
                   </button>
