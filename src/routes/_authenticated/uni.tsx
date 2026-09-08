@@ -56,20 +56,21 @@ function UniPage() {
     queryFn: () => fetchLectures({ data: {} }),
   });
 
-  const [selectedCourse, setSelectedCourse] = useState<string | "all">("all");
   const [courseDialogOpen, setCourseDialogOpen] = useState(false);
   const [lectureDialogOpen, setLectureDialogOpen] = useState(false);
+  const [lectureCourseId, setLectureCourseId] = useState<string>("");
   const [courseForm, setCourseForm] = useState({ name: "", code: "" });
   const [lectureForm, setLectureForm] = useState({
-    courseId: "",
     title: "",
     date: format(new Date(), "yyyy-MM-dd"),
   });
 
-  const filteredLectures =
-    selectedCourse === "all"
-      ? lectures
-      : lectures.filter((l) => l.course_id === selectedCourse);
+  const lecturesByCourse = new Map<string, typeof lectures>();
+  for (const lecture of lectures) {
+    const list = lecturesByCourse.get(lecture.course_id) ?? [];
+    list.push(lecture);
+    lecturesByCourse.set(lecture.course_id, list);
+  }
 
   async function handleAddCourse(e: React.FormEvent) {
     e.preventDefault();
@@ -86,18 +87,26 @@ function UniPage() {
     }
   }
 
+  function openLectureDialog(courseId: string) {
+    setLectureCourseId(courseId);
+    setLectureForm({
+      title: "",
+      date: format(new Date(), "yyyy-MM-dd"),
+    });
+    setLectureDialogOpen(true);
+  }
+
   async function handleAddLecture(e: React.FormEvent) {
     e.preventDefault();
     try {
       await createLectureFn({
         data: {
-          courseId: lectureForm.courseId,
+          courseId: lectureCourseId,
           title: lectureForm.title,
           lectureDate: lectureForm.date,
         },
       });
       setLectureForm({
-        courseId: courses[0]?.id ?? "",
         title: "",
         date: format(new Date(), "yyyy-MM-dd"),
       });
@@ -182,152 +191,60 @@ function UniPage() {
         </div>
       </section>
 
-      <section className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedCourse}
-            onChange={(e) => setSelectedCourse(e.target.value)}
-            className="rounded-full border border-line bg-card px-4 py-2 text-sm text-ink outline-none focus:ring-2 focus:ring-rust/20"
-          >
-            <option value="all">All courses</option>
-            {courses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex gap-2">
-          <Dialog open={courseDialogOpen} onOpenChange={setCourseDialogOpen}>
-            <DialogTrigger asChild>
+      <section className="mb-6 flex items-center justify-between">
+        <Dialog open={courseDialogOpen} onOpenChange={setCourseDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full border-line bg-card text-ink hover:bg-cream"
+            >
+              <Plus className="mr-1 size-4" /> Course
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="rounded-2xl border-line bg-card">
+            <DialogHeader>
+              <DialogTitle className="font-display text-xl text-ink">
+                Add course
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleAddCourse} className="mt-2 space-y-4">
+              <div>
+                <Label htmlFor="courseName" className="text-ink-soft">
+                  Course name
+                </Label>
+                <Input
+                  id="courseName"
+                  value={courseForm.name}
+                  onChange={(e) =>
+                    setCourseForm({ ...courseForm, name: e.target.value })
+                  }
+                  required
+                  className="mt-1 rounded-xl border-line bg-background text-ink"
+                />
+              </div>
+              <div>
+                <Label htmlFor="courseCode" className="text-ink-soft">
+                  Code (optional)
+                </Label>
+                <Input
+                  id="courseCode"
+                  value={courseForm.code}
+                  onChange={(e) =>
+                    setCourseForm({ ...courseForm, code: e.target.value })
+                  }
+                  className="mt-1 rounded-xl border-line bg-background text-ink"
+                />
+              </div>
               <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full border-line bg-card text-ink hover:bg-cream"
+                type="submit"
+                className="w-full rounded-full bg-rust text-cream hover:bg-rust/90"
               >
-                <Plus className="mr-1 size-4" /> Course
+                Save course
               </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-2xl border-line bg-card">
-              <DialogHeader>
-                <DialogTitle className="font-display text-xl text-ink">
-                  Add course
-                </DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleAddCourse} className="mt-2 space-y-4">
-                <div>
-                  <Label htmlFor="courseName" className="text-ink-soft">
-                    Course name
-                  </Label>
-                  <Input
-                    id="courseName"
-                    value={courseForm.name}
-                    onChange={(e) =>
-                      setCourseForm({ ...courseForm, name: e.target.value })
-                    }
-                    required
-                    className="mt-1 rounded-xl border-line bg-background text-ink"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="courseCode" className="text-ink-soft">
-                    Code (optional)
-                  </Label>
-                  <Input
-                    id="courseCode"
-                    value={courseForm.code}
-                    onChange={(e) =>
-                      setCourseForm({ ...courseForm, code: e.target.value })
-                    }
-                    className="mt-1 rounded-xl border-line bg-background text-ink"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full rounded-full bg-rust text-cream hover:bg-rust/90"
-                >
-                  Save course
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={lectureDialogOpen} onOpenChange={setLectureDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                className="rounded-full bg-ink text-cream hover:bg-ink/90"
-              >
-                <Plus className="mr-1 size-4" /> Lecture
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-2xl border-line bg-card">
-              <DialogHeader>
-                <DialogTitle className="font-display text-xl text-ink">
-                  Add lecture
-                </DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleAddLecture} className="mt-2 space-y-4">
-                <div>
-                  <Label htmlFor="lectureCourse" className="text-ink-soft">
-                    Course
-                  </Label>
-                  <select
-                    id="lectureCourse"
-                    value={lectureForm.courseId}
-                    onChange={(e) =>
-                      setLectureForm({ ...lectureForm, courseId: e.target.value })
-                    }
-                    required
-                    className="mt-1 w-full rounded-xl border border-line bg-background px-3 py-2 text-sm text-ink outline-none"
-                  >
-                    <option value="">Select a course</option>
-                    {courses.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="lectureTitle" className="text-ink-soft">
-                    Lecture title
-                  </Label>
-                  <Input
-                    id="lectureTitle"
-                    value={lectureForm.title}
-                    onChange={(e) =>
-                      setLectureForm({ ...lectureForm, title: e.target.value })
-                    }
-                    required
-                    className="mt-1 rounded-xl border-line bg-background text-ink"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="lectureDate" className="text-ink-soft">
-                    Date
-                  </Label>
-                  <Input
-                    id="lectureDate"
-                    type="date"
-                    value={lectureForm.date}
-                    onChange={(e) =>
-                      setLectureForm({ ...lectureForm, date: e.target.value })
-                    }
-                    required
-                    className="mt-1 rounded-xl border-line bg-background text-ink"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full rounded-full bg-rust text-cream hover:bg-rust/90"
-                >
-                  Save lecture
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </section>
 
       {courses.length === 0 ? (
@@ -342,80 +259,210 @@ function UniPage() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredLectures.map((lecture) => {
-            const course = courses.find((c) => c.id === lecture.course_id);
+        <div className="space-y-6">
+          {courses.map((course) => {
+            const courseLectures = lecturesByCourse.get(course.id) ?? [];
+            const studiedCount = courseLectures.filter((l) => l.completed).length;
+
             return (
-              <div
-                key={lecture.id}
-                className="flex items-center justify-between rounded-2xl border border-line bg-card p-4 shadow-sm transition hover:shadow-md"
+              <section
+                key={course.id}
+                className="rounded-2xl border border-line bg-card shadow-sm"
               >
-                <div className="flex items-start gap-3">
-                  <button
-                    onClick={() => toggleLecture(lecture.id, !!lecture.completed)}
-                    className={`mt-0.5 size-6 rounded-full border-2 transition ${
-                      lecture.completed
-                        ? "border-rust bg-rust text-cream"
-                        : "border-line bg-transparent text-ink-soft hover:border-rust/40"
-                    }`}
-                    aria-label={lecture.completed ? "Mark not studied" : "Mark studied"}
-                  >
-                    {lecture.completed && <Check className="size-4" />}
-                  </button>
-                  <div>
-                    <p className="font-medium text-ink">{lecture.title}</p>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-ink-soft">
-                      <span
-                        className="inline-block size-2 rounded-full"
-                        style={{ backgroundColor: course?.color ?? "#CE552F" }}
-                      />
-                      {course?.name}
-                      {lecture.lecture_date && (
-                        <span>· {format(new Date(lecture.lecture_date), "MMM d")}</span>
+                <div className="flex items-center justify-between border-b border-line px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="inline-block size-3 rounded-full"
+                      style={{ backgroundColor: course.color ?? "#CE552F" }}
+                    />
+                    <div>
+                      <h2 className="font-display text-lg font-medium text-ink">
+                        {course.name}
+                      </h2>
+                      {course.code && (
+                        <p className="text-xs text-ink-soft">{course.code}</p>
                       )}
                     </div>
                   </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-ink-soft">
+                      {studiedCount}/{courseLectures.length} studied
+                    </span>
                     <Button
                       variant="ghost"
-                      size="icon"
-                      className="text-ink-muted hover:text-ink"
+                      size="sm"
+                      onClick={() => openLectureDialog(course.id)}
+                      className="rounded-full text-ink hover:bg-cream"
                     >
-                      <MoreHorizontal className="size-4" />
+                      <Plus className="mr-1 size-4" /> Lecture
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    className="rounded-xl border-line bg-card"
-                  >
-                    <DropdownMenuItem
-                      onClick={() => removeLecture(lecture.id)}
-                      className="text-rust focus:bg-cream focus:text-rust"
-                    >
-                      <Trash2 className="mr-2 size-4" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-ink-muted hover:text-ink"
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="rounded-xl border-line bg-card"
+                      >
+                        <DropdownMenuItem
+                          onClick={() => removeCourse(course.id)}
+                          className="text-rust focus:bg-cream focus:text-rust"
+                        >
+                          <Trash2 className="mr-2 size-4" /> Delete course
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                <div className="divide-y divide-line">
+                  {courseLectures.length === 0 ? (
+                    <div className="px-5 py-6 text-center">
+                      <p className="text-sm text-ink-soft">No lectures yet.</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openLectureDialog(course.id)}
+                        className="mt-1 text-rust hover:text-rust/80"
+                      >
+                        Add the first lecture
+                      </Button>
+                    </div>
+                  ) : (
+                    courseLectures
+                      .slice()
+                      .sort(
+                        (a, b) =>
+                          new Date(a.lecture_date ?? 0).getTime() -
+                          new Date(b.lecture_date ?? 0).getTime()
+                      )
+                      .map((lecture) => (
+                        <div
+                          key={lecture.id}
+                          className="flex items-center justify-between px-5 py-4 transition hover:bg-cream/30"
+                        >
+                          <div className="flex items-start gap-3">
+                            <button
+                              onClick={() =>
+                                toggleLecture(lecture.id, !!lecture.completed)
+                              }
+                              className={`mt-0.5 size-6 rounded-full border-2 transition ${
+                                lecture.completed
+                                  ? "border-rust bg-rust text-cream"
+                                  : "border-line bg-transparent text-ink-soft hover:border-rust/40"
+                              }`}
+                              aria-label={
+                                lecture.completed ? "Mark not studied" : "Mark studied"
+                              }
+                            >
+                              {lecture.completed && <Check className="size-4" />}
+                            </button>
+                            <div>
+                              <p
+                                className={`font-medium ${
+                                  lecture.completed
+                                    ? "text-ink-soft line-through"
+                                    : "text-ink"
+                                }`}
+                              >
+                                {lecture.title}
+                              </p>
+                              {lecture.lecture_date && (
+                                <p className="mt-0.5 text-xs text-ink-soft">
+                                  {format(new Date(lecture.lecture_date), "MMM d, yyyy")}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeLecture(lecture.id)}
+                            className="text-ink-muted hover:text-rust"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </section>
             );
           })}
         </div>
       )}
 
-      {selectedCourse !== "all" && courses.find((c) => c.id === selectedCourse) && (
-        <div className="mt-8 flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => removeCourse(selectedCourse)}
-            className="text-ink-muted hover:text-rust"
-          >
-            <Trash2 className="mr-1 size-4" /> Delete this course
-          </Button>
-        </div>
-      )}
+      <Dialog open={lectureDialogOpen} onOpenChange={setLectureDialogOpen}>
+        <DialogContent className="rounded-2xl border-line bg-card">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl text-ink">
+              Add lecture
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddLecture} className="mt-2 space-y-4">
+            <div>
+              <Label htmlFor="lectureCourse" className="text-ink-soft">
+                Course
+              </Label>
+              <select
+                id="lectureCourse"
+                value={lectureCourseId}
+                onChange={(e) => setLectureCourseId(e.target.value)}
+                required
+                className="mt-1 w-full rounded-xl border border-line bg-background px-3 py-2 text-sm text-ink outline-none"
+              >
+                <option value="">Select a course</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="lectureTitle" className="text-ink-soft">
+                Lecture title
+              </Label>
+              <Input
+                id="lectureTitle"
+                value={lectureForm.title}
+                onChange={(e) =>
+                  setLectureForm({ ...lectureForm, title: e.target.value })
+                }
+                required
+                className="mt-1 rounded-xl border-line bg-background text-ink"
+              />
+            </div>
+            <div>
+              <Label htmlFor="lectureDate" className="text-ink-soft">
+                Date
+              </Label>
+              <Input
+                id="lectureDate"
+                type="date"
+                value={lectureForm.date}
+                onChange={(e) =>
+                  setLectureForm({ ...lectureForm, date: e.target.value })
+                }
+                required
+                className="mt-1 rounded-xl border-line bg-background text-ink"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full rounded-full bg-rust text-cream hover:bg-rust/90"
+            >
+              Save lecture
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
