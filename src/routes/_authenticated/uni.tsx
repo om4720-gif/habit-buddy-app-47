@@ -79,6 +79,84 @@ function UniPage() {
     date: format(new Date(), "yyyy-MM-dd"),
   });
 
+  const fetchDeadlines = useServerFn(getDeadlines);
+  const createDeadlineFn = useServerFn(createDeadline);
+  const updateDeadlineFn = useServerFn(updateDeadline);
+  const deleteDeadlineFn = useServerFn(deleteDeadline);
+
+  const { data: deadlines = [] } = useQuery({
+    queryKey: ["deadlines"],
+    queryFn: () => fetchDeadlines(),
+  });
+
+  const [deadlineDialogOpen, setDeadlineDialogOpen] = useState(false);
+  const [deadlineForm, setDeadlineForm] = useState({
+    courseId: "",
+    title: "",
+    kind: "assignment" as "assignment" | "quiz",
+    dueDate: format(new Date(), "yyyy-MM-dd"),
+  });
+
+  const reminderItems = deadlines.map((d) => ({
+    id: d.id,
+    title: d.title,
+    kind: d.kind,
+    due_date: d.due_date,
+    completed: d.completed,
+    courseName: d.courses?.name ?? null,
+  }));
+  const { permission, requestPermission, dueTomorrow } =
+    useDeadlineReminders(reminderItems);
+
+  async function handleAddDeadline(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await createDeadlineFn({
+        data: {
+          courseId: deadlineForm.courseId,
+          title: deadlineForm.title,
+          kind: deadlineForm.kind,
+          dueDate: deadlineForm.dueDate,
+        },
+      });
+      setDeadlineForm({
+        courseId: "",
+        title: "",
+        kind: "assignment",
+        dueDate: format(new Date(), "yyyy-MM-dd"),
+      });
+      setDeadlineDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["deadlines"] });
+      toast.success("Deadline added");
+    } catch {
+      toast.error("Could not add deadline");
+    }
+  }
+
+  async function toggleDeadline(deadlineId: string, completed: boolean) {
+    try {
+      await updateDeadlineFn({ data: { deadlineId, completed: !completed } });
+      queryClient.invalidateQueries({ queryKey: ["deadlines"] });
+    } catch {
+      toast.error("Could not update deadline");
+    }
+  }
+
+  async function removeDeadline(deadlineId: string) {
+    try {
+      await deleteDeadlineFn({ data: { deadlineId } });
+      queryClient.invalidateQueries({ queryKey: ["deadlines"] });
+      toast.success("Deadline removed");
+    } catch {
+      toast.error("Could not remove deadline");
+    }
+  }
+
+  const upcomingDeadlines = deadlines
+    .filter((d) => !d.completed)
+    .slice()
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+
   const lecturesByCourse = new Map<string, typeof lectures>();
   for (const lecture of lectures) {
     const list = lecturesByCourse.get(lecture.course_id) ?? [];
