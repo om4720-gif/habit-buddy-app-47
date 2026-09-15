@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { format } from "date-fns";
-import { Check, GraduationCap, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { differenceInCalendarDays, format } from "date-fns";
+import {
+  Bell,
+  Check,
+  GraduationCap,
+  MoreHorizontal,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -15,6 +22,13 @@ import {
   getLectures,
   updateLecture,
 } from "@/lib/uni.functions";
+import {
+  createDeadline,
+  deleteDeadline,
+  getDeadlines,
+  updateDeadline,
+} from "@/lib/deadlines.functions";
+import { useDeadlineReminders } from "@/lib/useDeadlineReminders";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -64,6 +78,84 @@ function UniPage() {
     title: "",
     date: format(new Date(), "yyyy-MM-dd"),
   });
+
+  const fetchDeadlines = useServerFn(getDeadlines);
+  const createDeadlineFn = useServerFn(createDeadline);
+  const updateDeadlineFn = useServerFn(updateDeadline);
+  const deleteDeadlineFn = useServerFn(deleteDeadline);
+
+  const { data: deadlines = [] } = useQuery({
+    queryKey: ["deadlines"],
+    queryFn: () => fetchDeadlines(),
+  });
+
+  const [deadlineDialogOpen, setDeadlineDialogOpen] = useState(false);
+  const [deadlineForm, setDeadlineForm] = useState({
+    courseId: "",
+    title: "",
+    kind: "assignment" as "assignment" | "quiz",
+    dueDate: format(new Date(), "yyyy-MM-dd"),
+  });
+
+  const reminderItems = deadlines.map((d) => ({
+    id: d.id,
+    title: d.title,
+    kind: d.kind,
+    due_date: d.due_date,
+    completed: d.completed,
+    courseName: d.courses?.name ?? null,
+  }));
+  const { permission, requestPermission, dueTomorrow } =
+    useDeadlineReminders(reminderItems);
+
+  async function handleAddDeadline(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await createDeadlineFn({
+        data: {
+          courseId: deadlineForm.courseId,
+          title: deadlineForm.title,
+          kind: deadlineForm.kind,
+          dueDate: deadlineForm.dueDate,
+        },
+      });
+      setDeadlineForm({
+        courseId: "",
+        title: "",
+        kind: "assignment",
+        dueDate: format(new Date(), "yyyy-MM-dd"),
+      });
+      setDeadlineDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["deadlines"] });
+      toast.success("Deadline added");
+    } catch {
+      toast.error("Could not add deadline");
+    }
+  }
+
+  async function toggleDeadline(deadlineId: string, completed: boolean) {
+    try {
+      await updateDeadlineFn({ data: { deadlineId, completed: !completed } });
+      queryClient.invalidateQueries({ queryKey: ["deadlines"] });
+    } catch {
+      toast.error("Could not update deadline");
+    }
+  }
+
+  async function removeDeadline(deadlineId: string) {
+    try {
+      await deleteDeadlineFn({ data: { deadlineId } });
+      queryClient.invalidateQueries({ queryKey: ["deadlines"] });
+      toast.success("Deadline removed");
+    } catch {
+      toast.error("Could not remove deadline");
+    }
+  }
+
+  const upcomingDeadlines = deadlines
+    .filter((d) => !d.completed)
+    .slice()
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
   const lecturesByCourse = new Map<string, typeof lectures>();
   for (const lecture of lectures) {
@@ -190,6 +282,218 @@ function UniPage() {
           <p className="mt-1 font-display text-2xl text-ink">{completionRate}%</p>
         </div>
       </section>
+
+      <section className="mb-8 rounded-2xl border border-line bg-card shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">
+          <div>
+            <h2 className="font-display text-lg font-medium text-ink">
+              Deadlines
+            </h2>
+            <p className="text-xs text-ink-soft">
+              Assignments and quizzes, with a reminder the day before.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {permission === "default" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={requestPermission}
+                className="rounded-full border-line bg-card text-ink hover:bg-cream"
+              >
+                <Bell className="mr-1 size-4" /> Turn on reminders
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDeadlineForm({
+                  courseId: courses[0]?.id ?? "",
+                  title: "",
+                  kind: "assignment",
+                  dueDate: format(new Date(), "yyyy-MM-dd"),
+                });
+                setDeadlineDialogOpen(true);
+              }}
+              disabled={courses.length === 0}
+              className="rounded-full border-line bg-card text-ink hover:bg-cream"
+            >
+              <Plus className="mr-1 size-4" /> Deadline
+            </Button>
+          </div>
+        </div>
+
+        {permission === "open-in-new-tab" && (
+          <p className="border-b border-line px-5 py-3 text-xs text-ink-soft">
+            Open the app in its own browser tab to allow pop-up reminders.
+          </p>
+        )}
+        {permission === "denied" && (
+          <p className="border-b border-line px-5 py-3 text-xs text-ink-soft">
+            Pop-ups are blocked for this site. Allow notifications in your
+            browser settings to get reminders.
+          </p>
+        )}
+        {permission === "unsupported" && (
+          <p className="border-b border-line px-5 py-3 text-xs text-ink-soft">
+            This browser cannot show pop-up reminders.
+          </p>
+        )}
+        {permission === "granted" && dueTomorrow.length > 0 && (
+          <p className="border-b border-line px-5 py-3 text-xs text-rust">
+            {dueTomorrow.length} due tomorrow.
+          </p>
+        )}
+
+        <div className="divide-y divide-line">
+          {upcomingDeadlines.length === 0 ? (
+            <p className="px-5 py-6 text-center text-sm text-ink-soft">
+              {courses.length === 0
+                ? "Add a course first, then add its deadlines."
+                : "Nothing due right now."}
+            </p>
+          ) : (
+            upcomingDeadlines.map((d) => {
+              const daysLeft = differenceInCalendarDays(
+                new Date(`${d.due_date}T00:00:00`),
+                new Date(new Date().toDateString())
+              );
+              return (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between px-5 py-4 transition hover:bg-cream/30"
+                >
+                  <div className="flex items-start gap-3">
+                    <button
+                      onClick={() => toggleDeadline(d.id, d.completed)}
+                      className="mt-0.5 size-6 rounded-full border-2 border-line text-ink-soft transition hover:border-rust/40"
+                      aria-label="Mark as done"
+                    >
+                      {d.completed && <Check className="size-4" />}
+                    </button>
+                    <div>
+                      <p className="font-medium text-ink">
+                        <span className="mr-2 rounded-full bg-cream px-2 py-0.5 text-[10px] uppercase tracking-[0.15em] text-ink-soft">
+                          {d.kind}
+                        </span>
+                        {d.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-ink-soft">
+                        {d.courses?.name ? `${d.courses.name} · ` : ""}
+                        {format(new Date(`${d.due_date}T00:00:00`), "MMM d, yyyy")}
+                        {" · "}
+                        {daysLeft < 0
+                          ? "overdue"
+                          : daysLeft === 0
+                            ? "due today"
+                            : daysLeft === 1
+                              ? "due tomorrow"
+                              : `in ${daysLeft} days`}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeDeadline(d.id)}
+                    className="text-ink-muted hover:text-rust"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      <Dialog open={deadlineDialogOpen} onOpenChange={setDeadlineDialogOpen}>
+        <DialogContent className="rounded-2xl border-line bg-card">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl text-ink">
+              Add deadline
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddDeadline} className="mt-2 space-y-4">
+            <div>
+              <Label htmlFor="deadlineCourse" className="text-ink-soft">
+                Course
+              </Label>
+              <select
+                id="deadlineCourse"
+                value={deadlineForm.courseId}
+                onChange={(e) =>
+                  setDeadlineForm({ ...deadlineForm, courseId: e.target.value })
+                }
+                required
+                className="mt-1 w-full rounded-xl border border-line bg-background px-3 py-2 text-sm text-ink outline-none"
+              >
+                <option value="">Select a course</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="deadlineKind" className="text-ink-soft">
+                Type
+              </Label>
+              <select
+                id="deadlineKind"
+                value={deadlineForm.kind}
+                onChange={(e) =>
+                  setDeadlineForm({
+                    ...deadlineForm,
+                    kind: e.target.value as "assignment" | "quiz",
+                  })
+                }
+                className="mt-1 w-full rounded-xl border border-line bg-background px-3 py-2 text-sm text-ink outline-none"
+              >
+                <option value="assignment">Assignment</option>
+                <option value="quiz">Quiz</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="deadlineTitle" className="text-ink-soft">
+                Title
+              </Label>
+              <Input
+                id="deadlineTitle"
+                value={deadlineForm.title}
+                onChange={(e) =>
+                  setDeadlineForm({ ...deadlineForm, title: e.target.value })
+                }
+                required
+                className="mt-1 rounded-xl border-line bg-background text-ink"
+              />
+            </div>
+            <div>
+              <Label htmlFor="deadlineDue" className="text-ink-soft">
+                Due date
+              </Label>
+              <Input
+                id="deadlineDue"
+                type="date"
+                value={deadlineForm.dueDate}
+                onChange={(e) =>
+                  setDeadlineForm({ ...deadlineForm, dueDate: e.target.value })
+                }
+                required
+                className="mt-1 rounded-xl border-line bg-background text-ink"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full rounded-full bg-rust text-cream hover:bg-rust/90"
+            >
+              Save deadline
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <section className="mb-6 flex items-center justify-between">
         <Dialog open={courseDialogOpen} onOpenChange={setCourseDialogOpen}>
