@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { format } from "date-fns";
-import { Check, GraduationCap, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { differenceInCalendarDays, format } from "date-fns";
+import {
+  Bell,
+  Check,
+  GraduationCap,
+  MoreHorizontal,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -15,6 +22,13 @@ import {
   getLectures,
   updateLecture,
 } from "@/lib/uni.functions";
+import {
+  createDeadline,
+  deleteDeadline,
+  getDeadlines,
+  updateDeadline,
+} from "@/lib/deadlines.functions";
+import { useDeadlineReminders } from "@/lib/useDeadlineReminders";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
