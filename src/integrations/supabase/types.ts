@@ -44,6 +44,50 @@ export type Database = {
         }
         Relationships: []
       }
+      deadlines: {
+        Row: {
+          completed: boolean
+          course_id: string
+          created_at: string
+          due_date: string
+          id: string
+          kind: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          course_id: string
+          created_at?: string
+          due_date: string
+          id?: string
+          kind?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          course_id?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          kind?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deadlines_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       habit_completions: {
         Row: {
           completed_date: string
