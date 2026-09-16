@@ -112,6 +112,7 @@ export const createLecture = createServerFn({ method: "POST" })
       .object({
         courseId: z.string().uuid(),
         title: z.string().min(1).max(300),
+        kind: z.enum(["lecture", "tutorial"]).optional(),
         lectureDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       })
       .parse(data)
@@ -122,6 +123,7 @@ export const createLecture = createServerFn({ method: "POST" })
       course_id: data.courseId,
       user_id: userId,
       title: data.title,
+      kind: data.kind ?? "lecture",
       lecture_date: data.lectureDate ?? null,
     });
     if (error) throw new Error(error.message);

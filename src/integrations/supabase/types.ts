@@ -159,6 +159,7 @@ export type Database = {
           course_id: string
           created_at: string | null
           id: string
+          kind: string
           lecture_date: string | null
           title: string
           updated_at: string | null
@@ -169,6 +170,7 @@ export type Database = {
           course_id: string
           created_at?: string | null
           id?: string
+          kind?: string
           lecture_date?: string | null
           title: string
           updated_at?: string | null
@@ -179,6 +181,7 @@ export type Database = {
           course_id?: string
           created_at?: string | null
           id?: string
+          kind?: string
           lecture_date?: string | null
           title?: string
           updated_at?: string | null
