@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { VoiceButton } from "@/components/VoiceButton";
 
 export const Route = createFileRoute("/_authenticated/uni")({
   component: UniPage,
@@ -747,7 +748,7 @@ function UniPage() {
         <DialogContent className="rounded-2xl border-line bg-card">
           <DialogHeader>
             <DialogTitle className="font-display text-xl text-ink">
-              Add lecture
+              {lectureForm.kind === "tutorial" ? "Add tutorial" : "Add lecture"}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddLecture} className="mt-2 space-y-4">
@@ -771,18 +772,47 @@ function UniPage() {
               </select>
             </div>
             <div>
-              <Label htmlFor="lectureTitle" className="text-ink-soft">
-                Lecture title
+              <Label htmlFor="lectureKind" className="text-ink-soft">
+                Type
               </Label>
-              <Input
-                id="lectureTitle"
-                value={lectureForm.title}
+              <select
+                id="lectureKind"
+                value={lectureForm.kind}
                 onChange={(e) =>
-                  setLectureForm({ ...lectureForm, title: e.target.value })
+                  setLectureForm({
+                    ...lectureForm,
+                    kind: e.target.value as "lecture" | "tutorial",
+                  })
                 }
-                required
-                className="mt-1 rounded-xl border-line bg-background text-ink"
-              />
+                className="mt-1 w-full rounded-xl border border-line bg-background px-3 py-2 text-sm text-ink outline-none"
+              >
+                <option value="lecture">Lecture</option>
+                <option value="tutorial">Tutorial</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="lectureTitle" className="text-ink-soft">
+                Title
+              </Label>
+              <div className="mt-1 flex items-center gap-2">
+                <Input
+                  id="lectureTitle"
+                  value={lectureForm.title}
+                  onChange={(e) =>
+                    setLectureForm({ ...lectureForm, title: e.target.value })
+                  }
+                  required
+                  className="rounded-xl border-line bg-background text-ink"
+                />
+                <VoiceButton
+                  onText={(text) =>
+                    setLectureForm((prev) => ({ ...prev, title: text }))
+                  }
+                />
+              </div>
+              <p className="mt-1 text-xs text-ink-soft">
+                Tap the microphone and say the title.
+              </p>
             </div>
             <div>
               <Label htmlFor="lectureDate" className="text-ink-soft">
