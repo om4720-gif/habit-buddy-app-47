@@ -339,6 +339,16 @@ function UniPage() {
         <p className="mt-1 text-sm text-ink-soft">
           Keep track of which lectures and tutorials you have studied and finished.
         </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <VoiceButton
+            onText={handleVoiceCommand}
+            label="Add by voice"
+            idleTitle="Say the course, lecture or tutorial, and its number"
+          />
+          <p className="text-xs text-ink-soft">
+            Say something like “Physics lecture 3” or “Math tutorial 2”.
+          </p>
+        </div>
       </header>
 
       <section className="mb-8 grid gap-4 sm:grid-cols-3">
