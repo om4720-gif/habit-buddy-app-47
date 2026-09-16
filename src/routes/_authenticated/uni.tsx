@@ -874,25 +874,15 @@ function UniPage() {
               <Label htmlFor="lectureTitle" className="text-ink-soft">
                 Title
               </Label>
-              <div className="mt-1 flex items-center gap-2">
-                <Input
-                  id="lectureTitle"
-                  value={lectureForm.title}
-                  onChange={(e) =>
-                    setLectureForm({ ...lectureForm, title: e.target.value })
-                  }
-                  required
-                  className="rounded-xl border-line bg-background text-ink"
-                />
-                <VoiceButton
-                  onText={(text) =>
-                    setLectureForm((prev) => ({ ...prev, title: text }))
-                  }
-                />
-              </div>
-              <p className="mt-1 text-xs text-ink-soft">
-                Tap the microphone and say the title.
-              </p>
+              <Input
+                id="lectureTitle"
+                value={lectureForm.title}
+                onChange={(e) =>
+                  setLectureForm({ ...lectureForm, title: e.target.value })
+                }
+                required
+                className="mt-1 rounded-xl border-line bg-background text-ink"
+              />
             </div>
             <div>
               <Label htmlFor="lectureDate" className="text-ink-soft">
