@@ -76,6 +76,7 @@ function UniPage() {
   const [courseForm, setCourseForm] = useState({ name: "", code: "" });
   const [lectureForm, setLectureForm] = useState({
     title: "",
+    kind: "lecture" as "lecture" | "tutorial",
     date: format(new Date(), "yyyy-MM-dd"),
   });
 
@@ -179,10 +180,11 @@ function UniPage() {
     }
   }
 
-  function openLectureDialog(courseId: string) {
+  function openLectureDialog(courseId: string, kind: "lecture" | "tutorial" = "lecture") {
     setLectureCourseId(courseId);
     setLectureForm({
       title: "",
+      kind,
       date: format(new Date(), "yyyy-MM-dd"),
     });
     setLectureDialogOpen(true);
@@ -195,11 +197,13 @@ function UniPage() {
         data: {
           courseId: lectureCourseId,
           title: lectureForm.title,
+          kind: lectureForm.kind,
           lectureDate: lectureForm.date,
         },
       });
       setLectureForm({
         title: "",
+        kind: lectureForm.kind,
         date: format(new Date(), "yyyy-MM-dd"),
       });
       setLectureDialogOpen(false);
