@@ -266,7 +266,7 @@ function UniPage() {
           Course tracker
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
-          Keep track of which lectures you have studied and finished.
+          Keep track of which lectures and tutorials you have studied and finished.
         </p>
       </header>
 
@@ -279,15 +279,21 @@ function UniPage() {
         </div>
         <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
           <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
-            Lectures
+            Lectures studied
           </p>
-          <p className="mt-1 font-display text-2xl text-ink">{lectures.length}</p>
+          <p className="mt-1 font-display text-2xl text-ink">{lectureRate}%</p>
+          <p className="text-xs text-ink-soft">
+            {lectureItems.filter((l) => l.completed).length}/{lectureItems.length}
+          </p>
         </div>
         <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
           <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
-            Studied
+            Tutorials studied
           </p>
-          <p className="mt-1 font-display text-2xl text-ink">{completionRate}%</p>
+          <p className="mt-1 font-display text-2xl text-ink">{tutorialRate}%</p>
+          <p className="text-xs text-ink-soft">
+            {tutorialItems.filter((l) => l.completed).length}/{tutorialItems.length}
+          </p>
         </div>
       </section>
 
