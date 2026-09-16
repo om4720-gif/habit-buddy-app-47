@@ -245,6 +245,76 @@ function UniPage() {
     }
   }
 
+  const NUMBER_WORDS: Record<string, number> = {
+    one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
+    nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14,
+    fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+    twenty: 20,
+  };
+
+  function normalize(value: string) {
+    return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  }
+
+  async function handleVoiceCommand(text: string) {
+    const spoken = normalize(text);
+    if (!spoken) {
+      toast.error("I did not catch that. Try again.");
+      return;
+    }
+
+    const match = courses
+      .map((course) => {
+        const name = normalize(course.name);
+        const code = course.code ? normalize(course.code) : "";
+        const hit =
+          (name && spoken.includes(name)) || (code && spoken.includes(code));
+        return { course, score: hit ? Math.max(name.length, code.length) : 0 };
+      })
+      .filter((m) => m.score > 0)
+      .sort((a, b) => b.score - a.score)[0];
+
+    if (!match) {
+      toast.error(`No course matched "${text}". Say the course name too.`);
+      return;
+    }
+
+    const kind: "lecture" | "tutorial" = /\btutorials?\b/.test(spoken)
+      ? "tutorial"
+      : "lecture";
+
+    const digit = spoken.match(/\b(\d{1,3})\b/);
+    let number: number | null = digit ? Number(digit[1]) : null;
+    if (number === null) {
+      for (const [word, value] of Object.entries(NUMBER_WORDS)) {
+        if (new RegExp(`\\b${word}\\b`).test(spoken)) {
+          number = value;
+          break;
+        }
+      }
+    }
+
+    const label = kind === "tutorial" ? "Tutorial" : "Lecture";
+    const title = number
+      ? `${label} ${number}`
+      : text.trim().replace(/\.$/, "") || label;
+
+    try {
+      await createLectureFn({
+        data: {
+          courseId: match.course.id,
+          title,
+          kind,
+          lectureDate: format(new Date(), "yyyy-MM-dd"),
+        },
+      });
+      queryClient.invalidateQueries({ queryKey: ["lectures"] });
+      toast.success(`${title} added to ${match.course.name}`);
+    } catch {
+      toast.error("Could not add that. Try again.");
+    }
+  }
+
   const lectureItems = lectures.filter((l) => l.kind !== "tutorial");
   const tutorialItems = lectures.filter((l) => l.kind === "tutorial");
   const rate = (items: typeof lectures) =>
@@ -269,6 +339,16 @@ function UniPage() {
         <p className="mt-1 text-sm text-ink-soft">
           Keep track of which lectures and tutorials you have studied and finished.
         </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <VoiceButton
+            onText={handleVoiceCommand}
+            label="Add by voice"
+            idleTitle="Say the course, lecture or tutorial, and its number"
+          />
+          <p className="text-xs text-ink-soft">
+            Say something like “Physics lecture 3” or “Math tutorial 2”.
+          </p>
+        </div>
       </header>
 
       <section className="mb-8 grid gap-4 sm:grid-cols-3">
@@ -794,25 +874,15 @@ function UniPage() {
               <Label htmlFor="lectureTitle" className="text-ink-soft">
                 Title
               </Label>
-              <div className="mt-1 flex items-center gap-2">
-                <Input
-                  id="lectureTitle"
-                  value={lectureForm.title}
-                  onChange={(e) =>
-                    setLectureForm({ ...lectureForm, title: e.target.value })
-                  }
-                  required
-                  className="rounded-xl border-line bg-background text-ink"
-                />
-                <VoiceButton
-                  onText={(text) =>
-                    setLectureForm((prev) => ({ ...prev, title: text }))
-                  }
-                />
-              </div>
-              <p className="mt-1 text-xs text-ink-soft">
-                Tap the microphone and say the title.
-              </p>
+              <Input
+                id="lectureTitle"
+                value={lectureForm.title}
+                onChange={(e) =>
+                  setLectureForm({ ...lectureForm, title: e.target.value })
+                }
+                required
+                className="mt-1 rounded-xl border-line bg-background text-ink"
+              />
             </div>
             <div>
               <Label htmlFor="lectureDate" className="text-ink-soft">
