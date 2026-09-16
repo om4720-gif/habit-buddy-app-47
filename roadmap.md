@@ -7,3 +7,4 @@
 - [x] Deadlines: assignments/quizzes per course with pop-up reminder 1 day before
 - [ ] Tutorials tracking under each course (alongside lectures)
 - [ ] Voice input to add lectures and tutorials
+- [ ] Separate "studied" percentage stats for lectures and tutorials
