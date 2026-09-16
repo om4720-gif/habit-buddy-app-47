@@ -579,8 +579,31 @@ function UniPage() {
       ) : (
         <div className="space-y-6">
           {courses.map((course) => {
-            const courseLectures = lecturesByCourse.get(course.id) ?? [];
-            const studiedCount = courseLectures.filter((l) => l.completed).length;
+            const courseItems = lecturesByCourse.get(course.id) ?? [];
+            const byDate = (items: typeof courseItems) =>
+              items
+                .slice()
+                .sort(
+                  (a, b) =>
+                    new Date(a.lecture_date ?? 0).getTime() -
+                    new Date(b.lecture_date ?? 0).getTime()
+                );
+            const groups: {
+              kind: "lecture" | "tutorial";
+              label: string;
+              items: typeof courseItems;
+            }[] = [
+              {
+                kind: "lecture",
+                label: "Lectures",
+                items: byDate(courseItems.filter((l) => l.kind !== "tutorial")),
+              },
+              {
+                kind: "tutorial",
+                label: "Tutorials",
+                items: byDate(courseItems.filter((l) => l.kind === "tutorial")),
+              },
+            ];
 
             return (
               <section
@@ -602,114 +625,118 @@ function UniPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-ink-soft">
-                      {studiedCount}/{courseLectures.length} studied
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openLectureDialog(course.id)}
-                      className="rounded-full text-ink hover:bg-cream"
-                    >
-                      <Plus className="mr-1 size-4" /> Lecture
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-ink-muted hover:text-ink"
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        className="rounded-xl border-line bg-card"
-                      >
-                        <DropdownMenuItem
-                          onClick={() => removeCourse(course.id)}
-                          className="text-rust focus:bg-cream focus:text-rust"
-                        >
-                          <Trash2 className="mr-2 size-4" /> Delete course
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-
-                <div className="divide-y divide-line">
-                  {courseLectures.length === 0 ? (
-                    <div className="px-5 py-6 text-center">
-                      <p className="text-sm text-ink-soft">No lectures yet.</p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
-                        size="sm"
-                        onClick={() => openLectureDialog(course.id)}
-                        className="mt-1 text-rust hover:text-rust/80"
+                        size="icon"
+                        className="text-ink-muted hover:text-ink"
                       >
-                        Add the first lecture
+                        <MoreHorizontal className="size-4" />
                       </Button>
-                    </div>
-                  ) : (
-                    courseLectures
-                      .slice()
-                      .sort(
-                        (a, b) =>
-                          new Date(a.lecture_date ?? 0).getTime() -
-                          new Date(b.lecture_date ?? 0).getTime()
-                      )
-                      .map((lecture) => (
-                        <div
-                          key={lecture.id}
-                          className="flex items-center justify-between px-5 py-4 transition hover:bg-cream/30"
-                        >
-                          <div className="flex items-start gap-3">
-                            <button
-                              onClick={() =>
-                                toggleLecture(lecture.id, !!lecture.completed)
-                              }
-                              className={`mt-0.5 size-6 rounded-full border-2 transition ${
-                                lecture.completed
-                                  ? "border-rust bg-rust text-cream"
-                                  : "border-line bg-transparent text-ink-soft hover:border-rust/40"
-                              }`}
-                              aria-label={
-                                lecture.completed ? "Mark not studied" : "Mark studied"
-                              }
-                            >
-                              {lecture.completed && <Check className="size-4" />}
-                            </button>
-                            <div>
-                              <p
-                                className={`font-medium ${
-                                  lecture.completed
-                                    ? "text-ink-soft line-through"
-                                    : "text-ink"
-                                }`}
-                              >
-                                {lecture.title}
-                              </p>
-                              {lecture.lecture_date && (
-                                <p className="mt-0.5 text-xs text-ink-soft">
-                                  {format(new Date(lecture.lecture_date), "MMM d, yyyy")}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeLecture(lecture.id)}
-                            className="text-ink-muted hover:text-rust"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      ))
-                  )}
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="rounded-xl border-line bg-card"
+                    >
+                      <DropdownMenuItem
+                        onClick={() => removeCourse(course.id)}
+                        className="text-rust focus:bg-cream focus:text-rust"
+                      >
+                        <Trash2 className="mr-2 size-4" /> Delete course
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
+
+                {groups.map((group) => {
+                  const studied = group.items.filter((l) => l.completed).length;
+                  const percent = group.items.length
+                    ? Math.round((studied / group.items.length) * 100)
+                    : 0;
+                  return (
+                    <div key={group.kind} className="border-b border-line last:border-b-0">
+                      <div className="flex items-center justify-between bg-cream/30 px-5 py-3">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
+                            {group.label}
+                          </p>
+                          <p className="text-xs text-ink-soft">
+                            {percent}% studied · {studied}/{group.items.length}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openLectureDialog(course.id, group.kind)}
+                          className="rounded-full text-ink hover:bg-cream"
+                        >
+                          <Plus className="mr-1 size-4" />
+                          {group.kind === "tutorial" ? "Tutorial" : "Lecture"}
+                        </Button>
+                      </div>
+
+                      <div className="divide-y divide-line">
+                        {group.items.length === 0 ? (
+                          <p className="px-5 py-5 text-center text-sm text-ink-soft">
+                            {group.kind === "tutorial"
+                              ? "No tutorials yet."
+                              : "No lectures yet."}
+                          </p>
+                        ) : (
+                          group.items.map((lecture) => (
+                            <div
+                              key={lecture.id}
+                              className="flex items-center justify-between px-5 py-4 transition hover:bg-cream/30"
+                            >
+                              <div className="flex items-start gap-3">
+                                <button
+                                  onClick={() =>
+                                    toggleLecture(lecture.id, !!lecture.completed)
+                                  }
+                                  className={`mt-0.5 size-6 rounded-full border-2 transition ${
+                                    lecture.completed
+                                      ? "border-rust bg-rust text-cream"
+                                      : "border-line bg-transparent text-ink-soft hover:border-rust/40"
+                                  }`}
+                                  aria-label={
+                                    lecture.completed ? "Mark not studied" : "Mark studied"
+                                  }
+                                >
+                                  {lecture.completed && <Check className="size-4" />}
+                                </button>
+                                <div>
+                                  <p
+                                    className={`font-medium ${
+                                      lecture.completed
+                                        ? "text-ink-soft line-through"
+                                        : "text-ink"
+                                    }`}
+                                  >
+                                    {lecture.title}
+                                  </p>
+                                  {lecture.lecture_date && (
+                                    <p className="mt-0.5 text-xs text-ink-soft">
+                                      {format(new Date(lecture.lecture_date), "MMM d, yyyy")}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeLecture(lecture.id)}
+                                className="text-ink-muted hover:text-rust"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </section>
             );
           })}
