@@ -244,10 +244,14 @@ function UniPage() {
     }
   }
 
-  const completedCount = lectures.filter((l) => l.completed).length;
-  const completionRate = lectures.length
-    ? Math.round((completedCount / lectures.length) * 100)
-    : 0;
+  const lectureItems = lectures.filter((l) => l.kind !== "tutorial");
+  const tutorialItems = lectures.filter((l) => l.kind === "tutorial");
+  const rate = (items: typeof lectures) =>
+    items.length
+      ? Math.round((items.filter((l) => l.completed).length / items.length) * 100)
+      : 0;
+  const lectureRate = rate(lectureItems);
+  const tutorialRate = rate(tutorialItems);
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10 sm:px-8">
