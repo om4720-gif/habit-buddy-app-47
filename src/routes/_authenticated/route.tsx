@@ -32,8 +32,13 @@ function AuthenticatedLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (isOffline()) {
+      setReady(true);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
+      if (!session && !isOffline()) {
         navigate({ to: "/auth" });
       } else {
         setReady(true);
@@ -43,7 +48,7 @@ function AuthenticatedLayout() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
+      if (!session && !isOffline()) {
         navigate({ to: "/auth" });
       }
     });
