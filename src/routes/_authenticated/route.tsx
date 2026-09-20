@@ -3,8 +3,14 @@ import { useEffect, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 
+/** Without a connection we cannot verify the sign-in, so keep the user in. */
+function isOffline() {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
+    if (isOffline()) return;
     const {
       data: { session },
     } = await supabase.auth.getSession();
