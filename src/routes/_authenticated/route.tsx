@@ -3,8 +3,14 @@ import { useEffect, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 
+/** Without a connection we cannot verify the sign-in, so keep the user in. */
+function isOffline() {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
+    if (isOffline()) return;
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -26,8 +32,13 @@ function AuthenticatedLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (isOffline()) {
+      setReady(true);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
+      if (!session && !isOffline()) {
         navigate({ to: "/auth" });
       } else {
         setReady(true);
@@ -37,7 +48,7 @@ function AuthenticatedLayout() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
+      if (!session && !isOffline()) {
         navigate({ to: "/auth" });
       }
     });

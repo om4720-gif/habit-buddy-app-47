@@ -10,3 +10,4 @@
 - [x] Separate "studied" percentage stats for lectures and tutorials
 - [x] Tutorials tracking under each course
 - [x] Voice input for lecture/tutorial titles
+- [x] Offline mode: cached pages + last-loaded data on phone and desktop
