@@ -22,7 +22,6 @@ export function setupOfflineCache(queryClient: QueryClient): void {
       staleTime: 1000 * 30,
       networkMode: "offlineFirst",
       retry: 1,
-524: 
     },
     mutations: {
       networkMode: "offlineFirst",
