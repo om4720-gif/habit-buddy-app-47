@@ -58,7 +58,9 @@ export const updateDeadline = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const updates: Database["public"]["Tables"]["deadlines"]["Update"] = {};
+    const updates: Database["public"]["Tables"]["deadlines"]["Update"] = {
+      updated_at: new Date().toISOString(),
+    };
     if (data.title !== undefined) updates.title = data.title;
     if (data.kind !== undefined) updates.kind = data.kind;
     if (data.dueDate !== undefined) updates.due_date = data.dueDate;
