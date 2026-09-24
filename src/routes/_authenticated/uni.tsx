@@ -107,7 +107,7 @@ function UniPage() {
     completed: d.completed,
     courseName: d.courses?.name ?? null,
   }));
-  const { permission, requestPermission, dueTomorrow } =
+  const { permission, requestPermission, dueSoon } =
     useDeadlineReminders(reminderItems);
 
   async function handleAddDeadline(e: React.FormEvent) {
@@ -378,78 +378,99 @@ function UniPage() {
         </div>
       </section>
 
-      <section className="mb-8 rounded-2xl border border-line bg-card shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">
-          <div>
-            <h2 className="font-display text-lg font-medium text-ink">
-              Deadlines
-            </h2>
-            <p className="text-xs text-ink-soft">
-              Assignments and quizzes, with a reminder the day before.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {permission === "default" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={requestPermission}
-                className="rounded-full border-line bg-card text-ink hover:bg-cream"
-              >
-                <Bell className="mr-1 size-4" /> Turn on reminders
-              </Button>
-            )}
+      {permission !== "granted" && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-card px-5 py-3 text-xs text-ink-soft">
+          <span>
+            {permission === "open-in-new-tab"
+              ? "Open the app in its own browser tab to allow pop-up reminders."
+              : permission === "denied"
+                ? "Pop-ups are blocked for this site. Allow notifications in your browser settings to get reminders."
+                : permission === "unsupported"
+                  ? "This browser cannot show pop-up reminders."
+                  : "Get a pop-up the day before assignments and two days before quizzes."}
+          </span>
+          {permission === "default" && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setDeadlineForm({
-                  courseId: courses[0]?.id ?? "",
-                  title: "",
-                  kind: "assignment",
-                  dueDate: format(new Date(), "yyyy-MM-dd"),
-                });
-                setDeadlineDialogOpen(true);
-              }}
-              disabled={courses.length === 0}
+              onClick={requestPermission}
               className="rounded-full border-line bg-card text-ink hover:bg-cream"
             >
-              <Plus className="mr-1 size-4" /> Deadline
+              <Bell className="mr-1 size-4" /> Turn on reminders
             </Button>
+          )}
+        </div>
+      )}
+
+      {(
+        [
+          {
+            kind: "assignment" as const,
+            heading: "Assignments",
+            sub: "Reminder the day before it's due.",
+            button: "Assignment",
+            soonLabel: "due tomorrow",
+          },
+          {
+            kind: "quiz" as const,
+            heading: "Quizzes",
+            sub: "Reminder two days before the quiz.",
+            button: "Quiz",
+            soonLabel: "in 2 days",
+          },
+        ]
+      ).map((section) => {
+        const items = upcomingDeadlines.filter((d) =>
+          section.kind === "quiz" ? d.kind === "quiz" : d.kind !== "quiz"
+        );
+        const soonCount = dueSoon.filter((d) =>
+          section.kind === "quiz" ? d.kind === "quiz" : d.kind !== "quiz"
+        ).length;
+        return (
+      <section key={section.kind} className="mb-8 rounded-2xl border border-line bg-card shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">
+          <div>
+            <h2 className="font-display text-lg font-medium text-ink">
+              {section.heading}
+            </h2>
+            <p className="text-xs text-ink-soft">{section.sub}</p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setDeadlineForm({
+                courseId: courses[0]?.id ?? "",
+                title: "",
+                kind: section.kind,
+                dueDate: format(new Date(), "yyyy-MM-dd"),
+              });
+              setDeadlineDialogOpen(true);
+            }}
+            disabled={courses.length === 0}
+            className="rounded-full border-line bg-card text-ink hover:bg-cream"
+          >
+            <Plus className="mr-1 size-4" /> {section.button}
+          </Button>
         </div>
 
-        {permission === "open-in-new-tab" && (
-          <p className="border-b border-line px-5 py-3 text-xs text-ink-soft">
-            Open the app in its own browser tab to allow pop-up reminders.
-          </p>
-        )}
-        {permission === "denied" && (
-          <p className="border-b border-line px-5 py-3 text-xs text-ink-soft">
-            Pop-ups are blocked for this site. Allow notifications in your
-            browser settings to get reminders.
-          </p>
-        )}
-        {permission === "unsupported" && (
-          <p className="border-b border-line px-5 py-3 text-xs text-ink-soft">
-            This browser cannot show pop-up reminders.
-          </p>
-        )}
-        {permission === "granted" && dueTomorrow.length > 0 && (
+        {permission === "granted" && soonCount > 0 && (
           <p className="border-b border-line px-5 py-3 text-xs text-rust">
-            {dueTomorrow.length} due tomorrow.
+            {soonCount} {section.soonLabel}.
           </p>
         )}
 
         <div className="divide-y divide-line">
-          {upcomingDeadlines.length === 0 ? (
+          {items.length === 0 ? (
             <p className="px-5 py-6 text-center text-sm text-ink-soft">
               {courses.length === 0
-                ? "Add a course first, then add its deadlines."
-                : "Nothing due right now."}
+                ? "Add a course first."
+                : section.kind === "quiz"
+                  ? "No upcoming quizzes."
+                  : "No assignments due."}
             </p>
           ) : (
-            upcomingDeadlines.map((d) => {
+            items.map((d) => {
               const daysLeft = differenceInCalendarDays(
                 new Date(`${d.due_date}T00:00:00`),
                 new Date(new Date().toDateString())
@@ -468,12 +489,7 @@ function UniPage() {
                       {d.completed && <Check className="size-4" />}
                     </button>
                     <div>
-                      <p className="font-medium text-ink">
-                        <span className="mr-2 rounded-full bg-cream px-2 py-0.5 text-[10px] uppercase tracking-[0.15em] text-ink-soft">
-                          {d.kind}
-                        </span>
-                        {d.title}
-                      </p>
+                      <p className="font-medium text-ink">{d.title}</p>
                       <p className="mt-0.5 text-xs text-ink-soft">
                         {d.courses?.name ? `${d.courses.name} · ` : ""}
                         {format(new Date(`${d.due_date}T00:00:00`), "MMM d, yyyy")}
@@ -481,9 +497,9 @@ function UniPage() {
                         {daysLeft < 0
                           ? "overdue"
                           : daysLeft === 0
-                            ? "due today"
+                            ? "today"
                             : daysLeft === 1
-                              ? "due tomorrow"
+                              ? "tomorrow"
                               : `in ${daysLeft} days`}
                       </p>
                     </div>
@@ -502,6 +518,8 @@ function UniPage() {
           )}
         </div>
       </section>
+        );
+      })}
 
       <Dialog open={deadlineDialogOpen} onOpenChange={setDeadlineDialogOpen}>
         <DialogContent className="rounded-2xl border-line bg-card">
