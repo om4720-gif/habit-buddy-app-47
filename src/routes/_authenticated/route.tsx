@@ -25,6 +25,7 @@ const navItems = [
   { to: "/", label: "Today" },
   { to: "/german", label: "German" },
   { to: "/uni", label: "University" },
+  { to: "/city", label: "City" },
 ];
 
 function AuthenticatedLayout() {
