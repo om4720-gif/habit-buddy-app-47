@@ -73,7 +73,7 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-ink">
-      <div className="mx-auto max-w-4xl px-6 py-8 sm:px-8 sm:py-12">
+      <div className="mx-auto max-w-4xl px-6 py-8 sm:px-8 sm:py-12 animate-rise">
         <Header
           date={date}
           streak={stats?.longestStreak ?? 0}

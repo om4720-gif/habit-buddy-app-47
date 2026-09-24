@@ -41,7 +41,7 @@ function GermanPage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10 sm:px-8">
+    <main className="mx-auto max-w-4xl px-6 py-10 sm:px-8 animate-rise">
       <header className="mb-8">
         <div className="flex items-center gap-2 text-rust">
           <BookOpen className="size-5" />
