@@ -109,7 +109,7 @@ function CityPage() {
   );
 }
 
-function Earn({ label, each, count = 0, pts = 0 }: { label: string; each: string; count?: number; pts?: number }) {
+function Earn({ label, each, count = 0, pts = 0 }: { label: string; each: string; count?: number | undefined; pts?: number | undefined }) {
   return (
     <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
       <p className="text-sm font-medium text-ink">{label}</p>
