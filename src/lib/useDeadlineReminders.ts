@@ -42,13 +42,6 @@ function todayISO() {
   ).padStart(2, "0")}`;
 }
 
-function tomorrowISO() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-}
 
 export function useDeadlineReminders(items: ReminderItem[]) {
   const [permission, setPermission] = useState<PermissionState>("default");
@@ -76,14 +69,14 @@ export function useDeadlineReminders(items: ReminderItem[]) {
     if (permission !== "granted") return;
 
     function check() {
-      const due = tomorrowISO();
       const today = todayISO();
       for (const item of items) {
-        if (item.completed || item.due_date !== due) continue;
+        if (item.completed || item.due_date !== reminderDate(item.kind)) continue;
         const key = `${item.id}:${today}`;
         if (readNotified().includes(key)) continue;
-        const label = item.kind === "quiz" ? "Quiz" : "Assignment";
-        new Notification(`${label} due tomorrow`, {
+        const heading =
+          item.kind === "quiz" ? "Quiz in 2 days" : "Assignment due tomorrow";
+        new Notification(heading, {
           body: item.courseName
             ? `${item.title} — ${item.courseName}`
             : item.title,
@@ -98,9 +91,17 @@ export function useDeadlineReminders(items: ReminderItem[]) {
     return () => window.clearInterval(timer);
   }, [items, permission]);
 
-  const dueTomorrow = items.filter(
-    (i) => !i.completed && i.due_date === tomorrowISO()
+  const dueSoon = items.filter(
+    (i) => !i.completed && i.due_date === reminderDate(i.kind)
   );
 
-  return { permission, requestPermission, dueTomorrow };
+  return { permission, requestPermission, dueSoon };
+}
+
+function reminderDate(kind: string) {
+  const d = new Date();
+  d.setDate(d.getDate() + (kind === "quiz" ? 2 : 1));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 }
