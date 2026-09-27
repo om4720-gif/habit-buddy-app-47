@@ -162,6 +162,35 @@ function UniPage() {
     }
   }
 
+  function openEditDeadline(d: (typeof deadlines)[number]) {
+    setEditingDeadlineId(d.id);
+    setEditDeadlineForm({
+      title: d.title,
+      kind: d.kind === "quiz" ? "quiz" : "assignment",
+      dueDate: d.due_date,
+    });
+  }
+
+  async function handleEditDeadline(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingDeadlineId) return;
+    try {
+      await updateDeadlineFn({
+        data: {
+          deadlineId: editingDeadlineId,
+          title: editDeadlineForm.title,
+          kind: editDeadlineForm.kind,
+          dueDate: editDeadlineForm.dueDate,
+        },
+      });
+      setEditingDeadlineId(null);
+      queryClient.invalidateQueries({ queryKey: ["deadlines"] });
+      toast.success("Deadline updated");
+    } catch {
+      toast.error("Could not update deadline");
+    }
+  }
+
   const upcomingDeadlines = deadlines
     .filter((d) => !d.completed)
     .slice()
