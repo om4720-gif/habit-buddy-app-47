@@ -5,6 +5,7 @@ import {
   Check,
   GraduationCap,
   MoreHorizontal,
+  Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -94,6 +95,12 @@ function UniPage() {
   const [deadlineDialogOpen, setDeadlineDialogOpen] = useState(false);
   const [deadlineForm, setDeadlineForm] = useState({
     courseId: "",
+    title: "",
+    kind: "assignment" as "assignment" | "quiz",
+    dueDate: format(new Date(), "yyyy-MM-dd"),
+  });
+  const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
+  const [editDeadlineForm, setEditDeadlineForm] = useState({
     title: "",
     kind: "assignment" as "assignment" | "quiz",
     dueDate: format(new Date(), "yyyy-MM-dd"),
