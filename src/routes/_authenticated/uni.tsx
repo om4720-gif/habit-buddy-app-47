@@ -5,6 +5,7 @@ import {
   Check,
   GraduationCap,
   MoreHorizontal,
+  Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -98,6 +99,12 @@ function UniPage() {
     kind: "assignment" as "assignment" | "quiz",
     dueDate: format(new Date(), "yyyy-MM-dd"),
   });
+  const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
+  const [editDeadlineForm, setEditDeadlineForm] = useState({
+    title: "",
+    kind: "assignment" as "assignment" | "quiz",
+    dueDate: format(new Date(), "yyyy-MM-dd"),
+  });
 
   const reminderItems = deadlines.map((d) => ({
     id: d.id,
@@ -152,6 +159,35 @@ function UniPage() {
       toast.success("Deadline removed");
     } catch {
       toast.error("Could not remove deadline");
+    }
+  }
+
+  function openEditDeadline(d: (typeof deadlines)[number]) {
+    setEditingDeadlineId(d.id);
+    setEditDeadlineForm({
+      title: d.title,
+      kind: d.kind === "quiz" ? "quiz" : "assignment",
+      dueDate: d.due_date,
+    });
+  }
+
+  async function handleEditDeadline(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingDeadlineId) return;
+    try {
+      await updateDeadlineFn({
+        data: {
+          deadlineId: editingDeadlineId,
+          title: editDeadlineForm.title,
+          kind: editDeadlineForm.kind,
+          dueDate: editDeadlineForm.dueDate,
+        },
+      });
+      setEditingDeadlineId(null);
+      queryClient.invalidateQueries({ queryKey: ["deadlines"] });
+      toast.success("Deadline updated");
+    } catch {
+      toast.error("Could not update deadline");
     }
   }
 
@@ -505,14 +541,25 @@ function UniPage() {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeDeadline(d.id)}
-                    className="text-ink-muted hover:text-rust"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditDeadline(d)}
+                      className="text-ink-muted hover:text-rust"
+                      aria-label="Edit deadline"
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeDeadline(d.id)}
+                      className="text-ink-muted hover:text-rust"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
                 </div>
               );
             })
@@ -604,6 +651,77 @@ function UniPage() {
               className="w-full rounded-full bg-rust text-cream hover:bg-rust/90"
             >
               Save deadline
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editingDeadlineId !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingDeadlineId(null);
+        }}
+      >
+        <DialogContent className="rounded-2xl border-line bg-card">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl text-ink">
+              Edit deadline
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditDeadline} className="mt-2 space-y-4">
+            <div>
+              <Label htmlFor="editDeadlineKind" className="text-ink-soft">
+                Type
+              </Label>
+              <select
+                id="editDeadlineKind"
+                value={editDeadlineForm.kind}
+                onChange={(e) =>
+                  setEditDeadlineForm({
+                    ...editDeadlineForm,
+                    kind: e.target.value as "assignment" | "quiz",
+                  })
+                }
+                className="mt-1 w-full rounded-xl border border-line bg-background px-3 py-2 text-sm text-ink outline-none"
+              >
+                <option value="assignment">Assignment</option>
+                <option value="quiz">Quiz</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="editDeadlineTitle" className="text-ink-soft">
+                Title
+              </Label>
+              <Input
+                id="editDeadlineTitle"
+                value={editDeadlineForm.title}
+                onChange={(e) =>
+                  setEditDeadlineForm({ ...editDeadlineForm, title: e.target.value })
+                }
+                required
+                className="mt-1 rounded-xl border-line bg-background text-ink"
+              />
+            </div>
+            <div>
+              <Label htmlFor="editDeadlineDue" className="text-ink-soft">
+                Due date
+              </Label>
+              <Input
+                id="editDeadlineDue"
+                type="date"
+                value={editDeadlineForm.dueDate}
+                onChange={(e) =>
+                  setEditDeadlineForm({ ...editDeadlineForm, dueDate: e.target.value })
+                }
+                required
+                className="mt-1 rounded-xl border-line bg-background text-ink"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full rounded-full bg-rust text-cream hover:bg-rust/90"
+            >
+              Save changes
             </Button>
           </form>
         </DialogContent>
