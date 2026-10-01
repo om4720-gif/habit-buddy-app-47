@@ -1,24 +1,7 @@
-import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-
-import { supabase } from "@/integrations/supabase/client";
-
-/** Without a connection we cannot verify the sign-in, so keep the user in. */
-function isOffline() {
-  return typeof navigator !== "undefined" && navigator.onLine === false;
-}
+import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: async () => {
-    if (isOffline()) return;
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
-      throw redirect({ to: "/auth" });
-    }
-  },
-  component: AuthenticatedLayout,
+  component: AppLayout,
 });
 
 const navItems = [
@@ -28,43 +11,7 @@ const navItems = [
   { to: "/city", label: "City" },
 ];
 
-function AuthenticatedLayout() {
-  const navigate = useNavigate();
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (isOffline()) {
-      setReady(true);
-      return;
-    }
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session && !isOffline()) {
-        navigate({ to: "/auth" });
-      } else {
-        setReady(true);
-      }
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session && !isOffline()) {
-        navigate({ to: "/auth" });
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  if (!ready) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="size-6 animate-pulse rounded-full bg-rust" />
-      </div>
-    );
-  }
-
+function AppLayout() {
   return (
     <div className="min-h-screen bg-background">
       <nav className="sticky top-0 z-40 border-b border-line bg-background/95 backdrop-blur-sm">
