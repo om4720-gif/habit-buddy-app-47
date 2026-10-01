@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { Database } from "@/integrations/supabase/types";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getDb } from "./db.server";
 import {
   computeConsistencyRate,
   computeLongestStreak,
@@ -14,18 +14,16 @@ import {
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const getHabitsForDate = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z.object({ date: dateSchema, category: z.enum(["general", "german", "uni"]).optional() }).parse(data)
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const { date, category } = data;
-    const { supabase, userId } = context;
+    const supabase = getDb();
 
     let query = supabase
       .from("habits")
       .select("id, name, description, category, created_at")
-      .eq("user_id", userId)
       .eq("archived", false);
     if (category) {
       query = query.eq("category", category);
@@ -39,7 +37,6 @@ export const getHabitsForDate = createServerFn({ method: "POST" })
     const { data: completions, error: completionsError } = await supabase
       .from("habit_completions")
       .select("habit_id, completed_date")
-      .eq("user_id", userId)
       .in("habit_id", habitIds.length > 0 ? habitIds : [""])
       .order("completed_date", { ascending: true });
 
@@ -72,19 +69,17 @@ export const getHabitsForDate = createServerFn({ method: "POST" })
   });
 
 export const toggleCompletion = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z.object({ habitId: z.string().uuid(), date: dateSchema }).parse(data)
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const { habitId, date } = data;
-    const { supabase, userId } = context;
+    const supabase = getDb();
 
     const { data: existing } = await supabase
       .from("habit_completions")
       .select("id")
       .eq("habit_id", habitId)
-      .eq("user_id", userId)
       .eq("completed_date", date)
       .maybeSingle();
 
@@ -99,7 +94,6 @@ export const toggleCompletion = createServerFn({ method: "POST" })
 
     const { error } = await supabase.from("habit_completions").insert({
       habit_id: habitId,
-      user_id: userId,
       completed_date: date,
     });
     if (error) throw new Error(error.message);
@@ -107,7 +101,6 @@ export const toggleCompletion = createServerFn({ method: "POST" })
   });
 
 export const createHabit = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
@@ -117,10 +110,9 @@ export const createHabit = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+  .handler(async ({ data }) => {
+    const supabase = getDb();
     const { error } = await supabase.from("habits").insert({
-      user_id: userId,
       name: data.name,
       description: data.description ?? null,
       category: data.category,
@@ -130,7 +122,6 @@ export const createHabit = createServerFn({ method: "POST" })
   });
 
 export const updateHabit = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
@@ -141,8 +132,8 @@ export const updateHabit = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+  .handler(async ({ data }) => {
+    const supabase = getDb();
     const { habitId } = data;
 
     const updates: Database["public"]["Tables"]["habits"]["Update"] = {
@@ -155,38 +146,33 @@ export const updateHabit = createServerFn({ method: "POST" })
     const { error } = await supabase
       .from("habits")
       .update(updates)
-      .eq("id", habitId)
-      .eq("user_id", userId);
+      .eq("id", habitId);
 
     if (error) throw new Error(error.message);
     return { success: true };
   });
 
 export const deleteHabit = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ habitId: z.string().uuid() }).parse(data))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+  .handler(async ({ data }) => {
+    const supabase = getDb();
     const { error } = await supabase
       .from("habits")
       .delete()
-      .eq("id", data.habitId)
-      .eq("user_id", userId);
+      .eq("id", data.habitId);
     if (error) throw new Error(error.message);
     return { success: true };
   });
 
 export const getStats = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ date: dateSchema }).parse(data))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const { date } = data;
-    const { supabase, userId } = context;
+    const supabase = getDb();
 
     const { data: habits, error: habitsError } = await supabase
       .from("habits")
       .select("id, name, archived")
-      .eq("user_id", userId)
       .order("created_at", { ascending: true });
 
     if (habitsError) throw new Error(habitsError.message);
@@ -197,7 +183,6 @@ export const getStats = createServerFn({ method: "POST" })
     const { data: completions, error: completionsError } = await supabase
       .from("habit_completions")
       .select("habit_id, completed_date")
-      .eq("user_id", userId)
       .in("habit_id", allHabitIds.length > 0 ? allHabitIds : [""]);
 
     if (completionsError) throw new Error(completionsError.message);
@@ -242,11 +227,10 @@ export const getStats = createServerFn({ method: "POST" })
   });
 
 export const getWeeklyProgress = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ date: dateSchema }).parse(data))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const { date } = data;
-    const { supabase, userId } = context;
+    const supabase = getDb();
 
     const end = new Date(`${date}T00:00:00`);
     const start = new Date(end.getTime() - 6 * 24 * 60 * 60 * 1000);
@@ -255,7 +239,6 @@ export const getWeeklyProgress = createServerFn({ method: "POST" })
     const { data: habits, error: habitsError } = await supabase
       .from("habits")
       .select("id")
-      .eq("user_id", userId)
       .eq("archived", false);
 
     if (habitsError) throw new Error(habitsError.message);
@@ -264,7 +247,6 @@ export const getWeeklyProgress = createServerFn({ method: "POST" })
     const { data: completions, error: completionsError } = await supabase
       .from("habit_completions")
       .select("habit_id, completed_date")
-      .eq("user_id", userId)
       .gte("completed_date", startStr)
       .lte("completed_date", date)
       .in("habit_id", habitIds.length > 0 ? habitIds : [""]);

@@ -3,23 +3,19 @@ import { z } from "zod";
 
 import type { Database } from "@/integrations/supabase/types";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getDb } from "./db.server";
 
-export const getCourses = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data, error } = await supabase
-      .from("courses")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: true });
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  });
+export const getCourses = createServerFn({ method: "POST" }).handler(async () => {
+  const supabase = getDb();
+  const { data, error } = await supabase
+    .from("courses")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+});
 
 export const createCourse = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
@@ -29,10 +25,9 @@ export const createCourse = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+  .handler(async ({ data }) => {
+    const supabase = getDb();
     const { error } = await supabase.from("courses").insert({
-      user_id: userId,
       name: data.name,
       code: data.code ?? null,
       color: data.color ?? "#CE552F",
@@ -42,7 +37,6 @@ export const createCourse = createServerFn({ method: "POST" })
   });
 
 export const updateCourse = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
@@ -53,8 +47,8 @@ export const updateCourse = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+  .handler(async ({ data }) => {
+    const supabase = getDb();
     const { courseId } = data;
     const updates: Database["public"]["Tables"]["courses"]["Update"] = {
       updated_at: new Date().toISOString(),
@@ -65,37 +59,32 @@ export const updateCourse = createServerFn({ method: "POST" })
     const { error } = await supabase
       .from("courses")
       .update(updates)
-      .eq("id", courseId)
-      .eq("user_id", userId);
+      .eq("id", courseId);
     if (error) throw new Error(error.message);
     return { success: true };
   });
 
 export const deleteCourse = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ courseId: z.string().uuid() }).parse(data))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+  .handler(async ({ data }) => {
+    const supabase = getDb();
     const { error } = await supabase
       .from("courses")
       .delete()
-      .eq("id", data.courseId)
-      .eq("user_id", userId);
+      .eq("id", data.courseId);
     if (error) throw new Error(error.message);
     return { success: true };
   });
 
 export const getLectures = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z.object({ courseId: z.string().uuid().optional() }).parse(data)
   )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+  .handler(async ({ data }) => {
+    const supabase = getDb();
     let query = supabase
       .from("lectures")
       .select("*, courses(name, color)")
-      .eq("user_id", userId)
       .order("lecture_date", { ascending: false });
     if (data.courseId) {
       query = query.eq("course_id", data.courseId);
@@ -106,7 +95,6 @@ export const getLectures = createServerFn({ method: "POST" })
   });
 
 export const createLecture = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
@@ -117,11 +105,10 @@ export const createLecture = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+  .handler(async ({ data }) => {
+    const supabase = getDb();
     const { error } = await supabase.from("lectures").insert({
       course_id: data.courseId,
-      user_id: userId,
       title: data.title,
       kind: data.kind ?? "lecture",
       lecture_date: data.lectureDate ?? null,
@@ -131,7 +118,6 @@ export const createLecture = createServerFn({ method: "POST" })
   });
 
 export const updateLecture = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
@@ -142,8 +128,8 @@ export const updateLecture = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+  .handler(async ({ data }) => {
+    const supabase = getDb();
     const { lectureId } = data;
     const updates: Database["public"]["Tables"]["lectures"]["Update"] = {
       updated_at: new Date().toISOString(),
@@ -154,22 +140,19 @@ export const updateLecture = createServerFn({ method: "POST" })
     const { error } = await supabase
       .from("lectures")
       .update(updates)
-      .eq("id", lectureId)
-      .eq("user_id", userId);
+      .eq("id", lectureId);
     if (error) throw new Error(error.message);
     return { success: true };
   });
 
 export const deleteLecture = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ lectureId: z.string().uuid() }).parse(data))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+  .handler(async ({ data }) => {
+    const supabase = getDb();
     const { error } = await supabase
       .from("lectures")
       .delete()
-      .eq("id", data.lectureId)
-      .eq("user_id", userId);
+      .eq("id", data.lectureId);
     if (error) throw new Error(error.message);
     return { success: true };
   });
