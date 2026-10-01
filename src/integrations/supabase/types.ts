@@ -22,7 +22,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           code?: string | null
@@ -31,7 +31,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           code?: string | null
@@ -40,7 +40,7 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -54,7 +54,7 @@ export type Database = {
           kind: string
           title: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           completed?: boolean
@@ -65,7 +65,7 @@ export type Database = {
           kind?: string
           title: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           completed?: boolean
@@ -76,7 +76,7 @@ export type Database = {
           kind?: string
           title?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -94,21 +94,21 @@ export type Database = {
           created_at: string | null
           habit_id: string
           id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           completed_date: string
           created_at?: string | null
           habit_id: string
           id?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           completed_date?: string
           created_at?: string | null
           habit_id?: string
           id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -129,7 +129,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           archived?: boolean | null
@@ -139,7 +139,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           archived?: boolean | null
@@ -149,7 +149,7 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -163,7 +163,7 @@ export type Database = {
           lecture_date: string | null
           title: string
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           completed?: boolean | null
@@ -174,7 +174,7 @@ export type Database = {
           lecture_date?: string | null
           title: string
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           completed?: boolean | null
@@ -185,7 +185,7 @@ export type Database = {
           lecture_date?: string | null
           title?: string
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
