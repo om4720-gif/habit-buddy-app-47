@@ -33,7 +33,7 @@ export const createDeadline = createServerFn({ method: "POST" })
       title: data.title,
       kind: data.kind,
       due_date: data.dueDate,
-    });
+    } as never);
     if (error) throw new Error(error.message);
     return { success: true };
   });

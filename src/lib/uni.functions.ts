@@ -31,7 +31,7 @@ export const createCourse = createServerFn({ method: "POST" })
       name: data.name,
       code: data.code ?? null,
       color: data.color ?? "#CE552F",
-    });
+    } as never);
     if (error) throw new Error(error.message);
     return { success: true };
   });
@@ -112,7 +112,7 @@ export const createLecture = createServerFn({ method: "POST" })
       title: data.title,
       kind: data.kind ?? "lecture",
       lecture_date: data.lectureDate ?? null,
-    });
+    } as never);
     if (error) throw new Error(error.message);
     return { success: true };
   });

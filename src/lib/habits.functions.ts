@@ -95,7 +95,7 @@ export const toggleCompletion = createServerFn({ method: "POST" })
     const { error } = await supabase.from("habit_completions").insert({
       habit_id: habitId,
       completed_date: date,
-    });
+    } as never);
     if (error) throw new Error(error.message);
     return { completed: true };
   });
@@ -116,7 +116,7 @@ export const createHabit = createServerFn({ method: "POST" })
       name: data.name,
       description: data.description ?? null,
       category: data.category,
-    });
+    } as never);
     if (error) throw new Error(error.message);
     return { success: true };
   });
