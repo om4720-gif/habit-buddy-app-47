@@ -385,6 +385,21 @@ function UniPage() {
           <p className="text-xs text-ink-soft">
             Say something like “Physics lecture 3” or “Math tutorial 2”.
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const url = "https://habit-buddy-app-47.lovable.app/api/public/claude";
+              try {
+                await navigator.clipboard.writeText(url);
+                toast.success("Claude link copied — paste it into Claude");
+              } catch {
+                toast.message(url);
+              }
+            }}
+          >
+            Copy Claude link
+          </Button>
         </div>
       </header>
 
