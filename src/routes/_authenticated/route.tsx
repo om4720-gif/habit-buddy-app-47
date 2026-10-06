@@ -50,6 +50,7 @@ function AppLayout() {
             {navItems.map((item) => (
               <NavLink key={item.to} to={item.to} label={item.label} />
             ))}
+            <SignOut />
           </div>
         </div>
       </nav>
