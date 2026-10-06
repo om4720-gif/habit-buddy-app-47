@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      claude_feed_tokens: {
+        Row: {
+          created_at: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          token?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       courses: {
         Row: {
           code: string | null
@@ -22,7 +40,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           code?: string | null
@@ -31,7 +49,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Update: {
           code?: string | null
@@ -40,7 +58,7 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -54,7 +72,7 @@ export type Database = {
           kind: string
           title: string
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           completed?: boolean
@@ -65,7 +83,7 @@ export type Database = {
           kind?: string
           title: string
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
         Update: {
           completed?: boolean
@@ -76,7 +94,7 @@ export type Database = {
           kind?: string
           title?: string
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -94,21 +112,21 @@ export type Database = {
           created_at: string | null
           habit_id: string
           id: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           completed_date: string
           created_at?: string | null
           habit_id: string
           id?: string
-          user_id?: string | null
+          user_id?: string
         }
         Update: {
           completed_date?: string
           created_at?: string | null
           habit_id?: string
           id?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -129,7 +147,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           archived?: boolean | null
@@ -139,7 +157,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Update: {
           archived?: boolean | null
@@ -149,7 +167,7 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -163,7 +181,7 @@ export type Database = {
           lecture_date: string | null
           title: string
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           completed?: boolean | null
@@ -174,7 +192,7 @@ export type Database = {
           lecture_date?: string | null
           title: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Update: {
           completed?: boolean | null
@@ -185,7 +203,7 @@ export type Database = {
           lecture_date?: string | null
           title?: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
