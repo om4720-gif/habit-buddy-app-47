@@ -1,8 +1,35 @@
-import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouteContext } from "@tanstack/react-router";
+
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated")({
+  ssr: false,
+  beforeLoad: async () => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) throw redirect({ to: "/auth" });
+  },
   component: AppLayout,
 });
+
+function SignOut() {
+  const navigate = useNavigate();
+  const { queryClient } = useRouteContext({ from: "__root__" });
+  return (
+    <button
+      type="button"
+      className="rounded-full px-3 py-1.5 text-xs font-medium text-ink-soft transition hover:text-ink"
+      onClick={async () => {
+        await queryClient.cancelQueries();
+        queryClient.clear();
+        await supabase.auth.signOut();
+        navigate({ to: "/auth", replace: true });
+      }}
+    >
+      Sign out
+    </button>
+  );
+}
 
 const navItems = [
   { to: "/", label: "Today" },
