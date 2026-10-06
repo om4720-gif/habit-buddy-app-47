@@ -3,10 +3,11 @@ import { z } from "zod";
 
 import type { Database } from "@/integrations/supabase/types";
 
-import { getDb } from "./db.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export const getDeadlines = createServerFn({ method: "POST" }).handler(async () => {
-  const supabase = getDb();
+export const getDeadlines = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).handler(async ({ context }) => {
+  const supabase = context.supabase;
   const { data, error } = await supabase
     .from("deadlines")
     .select("*, courses(name, color)")
@@ -16,6 +17,7 @@ export const getDeadlines = createServerFn({ method: "POST" }).handler(async () 
 });
 
 export const createDeadline = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
@@ -26,8 +28,8 @@ export const createDeadline = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data }) => {
-    const supabase = getDb();
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
     const { error } = await supabase.from("deadlines").insert({
       course_id: data.courseId,
       title: data.title,
@@ -39,6 +41,7 @@ export const createDeadline = createServerFn({ method: "POST" })
   });
 
 export const updateDeadline = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
@@ -50,8 +53,8 @@ export const updateDeadline = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data }) => {
-    const supabase = getDb();
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
     const updates: Database["public"]["Tables"]["deadlines"]["Update"] = {
       updated_at: new Date().toISOString(),
     };
@@ -68,9 +71,10 @@ export const updateDeadline = createServerFn({ method: "POST" })
   });
 
 export const deleteDeadline = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ deadlineId: z.string().uuid() }).parse(data))
-  .handler(async ({ data }) => {
-    const supabase = getDb();
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
     const { error } = await supabase
       .from("deadlines")
       .delete()

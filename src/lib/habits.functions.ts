@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { Database } from "@/integrations/supabase/types";
 
-import { getDb } from "./db.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   computeConsistencyRate,
   computeLongestStreak,
@@ -14,12 +14,13 @@ import {
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const getHabitsForDate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z.object({ date: dateSchema, category: z.enum(["general", "german", "uni"]).optional() }).parse(data)
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { date, category } = data;
-    const supabase = getDb();
+    const supabase = context.supabase;
 
     let query = supabase
       .from("habits")
@@ -69,12 +70,13 @@ export const getHabitsForDate = createServerFn({ method: "POST" })
   });
 
 export const toggleCompletion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z.object({ habitId: z.string().uuid(), date: dateSchema }).parse(data)
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { habitId, date } = data;
-    const supabase = getDb();
+    const supabase = context.supabase;
 
     const { data: existing } = await supabase
       .from("habit_completions")
@@ -101,6 +103,7 @@ export const toggleCompletion = createServerFn({ method: "POST" })
   });
 
 export const createHabit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
@@ -110,8 +113,8 @@ export const createHabit = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data }) => {
-    const supabase = getDb();
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
     const { error } = await supabase.from("habits").insert({
       name: data.name,
       description: data.description ?? null,
@@ -122,6 +125,7 @@ export const createHabit = createServerFn({ method: "POST" })
   });
 
 export const updateHabit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
@@ -132,8 +136,8 @@ export const updateHabit = createServerFn({ method: "POST" })
       })
       .parse(data)
   )
-  .handler(async ({ data }) => {
-    const supabase = getDb();
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
     const { habitId } = data;
 
     const updates: Database["public"]["Tables"]["habits"]["Update"] = {
@@ -153,9 +157,10 @@ export const updateHabit = createServerFn({ method: "POST" })
   });
 
 export const deleteHabit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ habitId: z.string().uuid() }).parse(data))
-  .handler(async ({ data }) => {
-    const supabase = getDb();
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
     const { error } = await supabase
       .from("habits")
       .delete()
@@ -165,10 +170,11 @@ export const deleteHabit = createServerFn({ method: "POST" })
   });
 
 export const getStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ date: dateSchema }).parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { date } = data;
-    const supabase = getDb();
+    const supabase = context.supabase;
 
     const { data: habits, error: habitsError } = await supabase
       .from("habits")
@@ -227,10 +233,11 @@ export const getStats = createServerFn({ method: "POST" })
   });
 
 export const getWeeklyProgress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) => z.object({ date: dateSchema }).parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { date } = data;
-    const supabase = getDb();
+    const supabase = context.supabase;
 
     const end = new Date(`${date}T00:00:00`);
     const start = new Date(end.getTime() - 6 * 24 * 60 * 60 * 1000);

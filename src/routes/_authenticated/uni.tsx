@@ -389,7 +389,9 @@ function UniPage() {
             variant="outline"
             size="sm"
             onClick={async () => {
-              const url = "https://habit-buddy-app-47.lovable.app/api/public/claude";
+              const { getClaudeFeedToken } = await import("@/lib/claude.functions");
+              const { token } = await getClaudeFeedToken();
+              const url = `https://habit-buddy-app-47.lovable.app/api/public/claude?key=${token}`;
               try {
                 await navigator.clipboard.writeText(url);
                 toast.success("Claude link copied — paste it into Claude");

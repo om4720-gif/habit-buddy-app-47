@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { getDb } from "./db.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const POINTS = {
   habit: 5,
@@ -10,8 +10,9 @@ export const POINTS = {
   earlyMaxDays: 5,
 };
 
-export const getCityProgress = createServerFn({ method: "POST" }).handler(async () => {
-  const supabase = getDb();
+export const getCityProgress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth]).handler(async ({ context }) => {
+  const supabase = context.supabase;
   const [habits, lectures, deadlines] = await Promise.all([
     supabase
       .from("habit_completions")

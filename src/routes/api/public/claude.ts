@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 
-import { getDb } from "@/lib/db.server";
 
 function pct(done: number, total: number) {
   return total === 0 ? "—" : `${Math.round((done / total) * 100)}%`;
@@ -10,16 +9,21 @@ function pct(done: number, total: number) {
 export const Route = createFileRoute("/api/public/claude")({
   server: {
     handlers: {
-      GET: async () => {
-        const db = getDb();
+      GET: async ({ request }) => {
+        const key = new URL(request.url).searchParams.get("key") ?? "";
+        if (!/^[a-f0-9]{48}$/.test(key)) return new Response("Unauthorized", { status: 401 });
+        const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
+        const { data: tok } = await db.from("claude_feed_tokens").select("user_id").eq("token", key).maybeSingle();
+        if (!tok) return new Response("Unauthorized", { status: 401 });
+        const uid = tok.user_id;
         const [courses, lectures, deadlines, habits, completions] = await Promise.all([
-          db.from("courses").select("id,name,code").order("name"),
-          db.from("lectures").select("course_id,title,kind,lecture_date,completed").order("lecture_date"),
-          db.from("deadlines").select("course_id,title,kind,due_date,completed").order("due_date"),
-          db.from("habits").select("id,name,category").eq("archived", false),
+          db.from("courses").select("id,name,code").eq("user_id", uid).order("name"),
+          db.from("lectures").select("course_id,title,kind,lecture_date,completed").eq("user_id", uid).order("lecture_date"),
+          db.from("deadlines").select("course_id,title,kind,due_date,completed").eq("user_id", uid).order("due_date"),
+          db.from("habits").select("id,name,category").eq("user_id", uid).eq("archived", false),
           db
             .from("habit_completions")
-            .select("habit_id,completed_date")
+            .select("habit_id,completed_date").eq("user_id", uid)
             .gte("completed_date", format(new Date(Date.now() - 7 * 864e5), "yyyy-MM-dd")),
         ]);
         const err = courses.error || lectures.error || deadlines.error || habits.error || completions.error;
