@@ -8,6 +8,13 @@
       "when": 1791247290154,
       "tag": "0000_restore_owner_only_access",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791386659799,
+      "tag": "0001_course_photos",
+      "breakpoints": true
     }
   ]
 }
