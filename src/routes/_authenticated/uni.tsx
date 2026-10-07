@@ -47,6 +47,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { VoiceButton } from "@/components/VoiceButton";
+import { CoursePhotos } from "@/components/CoursePhotos";
 
 export const Route = createFileRoute("/_authenticated/uni")({
   component: UniPage,
@@ -972,6 +973,7 @@ function UniPage() {
                     </div>
                   );
                 })}
+                <CoursePhotos courseId={course.id} />
               </section>
             );
           })}
