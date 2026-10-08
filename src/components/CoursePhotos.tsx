@@ -102,7 +102,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
               <button
                 onClick={() => remove(p)}
                 aria-label="Delete photo"
-                className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-ink/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-ink/70 text-background opacity-0 transition-opacity group-hover:opacity-100"
               >
                 <X className="size-3.5" />
               </button>
