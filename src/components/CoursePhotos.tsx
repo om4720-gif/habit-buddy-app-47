@@ -176,7 +176,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
     qc.invalidateQueries({ queryKey: key });
   }
 
-  function tile(name: string, label?: string) {
+  function tile(name: string | null, label?: string) {
     const items =
       name == null ? unsorted : photos.filter((p) => p.folder_name === name);
     return (
