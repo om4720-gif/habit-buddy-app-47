@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, Loader2, X } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -11,8 +11,9 @@ type Photo = { id: string; path: string; url: string };
 export function CoursePhotos({ courseId }: { courseId: string }) {
   const qc = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
+  const touchX = useRef<number | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [open, setOpen] = useState<Photo | null>(null);
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
   const key = ["course-photos", courseId];
 
   const { data: photos = [] } = useQuery({
@@ -32,6 +33,26 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
     },
     staleTime: 30 * 60 * 1000,
   });
+
+  const open = openIdx != null && openIdx < photos.length ? photos[openIdx] : null;
+
+  function step(delta: number) {
+    setOpenIdx((i) => {
+      if (i == null || photos.length === 0) return i;
+      return (i + delta + photos.length) % photos.length;
+    });
+  }
+
+  useEffect(() => {
+    if (openIdx == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") step(-1);
+      else if (e.key === "ArrowRight") step(1);
+      else if (e.key === "Escape") setOpenIdx(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openIdx, photos.length]);
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
@@ -64,7 +85,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
   async function remove(p: Photo) {
     await supabase.storage.from("course-photos").remove([p.path]);
     await supabase.from("course_photos").delete().eq("id", p.id);
-    setOpen(null);
+    setOpenIdx(null);
     qc.invalidateQueries({ queryKey: key });
   }
 
@@ -94,9 +115,9 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
       </div>
       {photos.length > 0 && (
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-          {photos.map((p) => (
+          {photos.map((p, i) => (
             <div key={p.id} className="group relative aspect-square overflow-hidden rounded-lg border border-line">
-              <button onClick={() => setOpen(p)} className="size-full">
+              <button onClick={() => setOpenIdx(i)} className="size-full">
                 <img src={p.url} alt="Tutorial photo" loading="lazy" className="size-full object-cover" />
               </button>
               <button
@@ -111,11 +132,61 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
         </div>
       )}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4" onClick={() => setOpen(null)}>
-          <img src={open.url} alt="Tutorial photo" className="max-h-[85vh] max-w-full rounded-lg" />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4"
+          onClick={() => setOpenIdx(null)}
+          onTouchStart={(e) => {
+            touchX.current = e.changedTouches[0].clientX;
+          }}
+          onTouchEnd={(e) => {
+            if (touchX.current == null) return;
+            const dx = e.changedTouches[0].clientX - touchX.current;
+            touchX.current = null;
+            if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1);
+          }}
+        >
+          <img
+            src={open.url}
+            alt="Tutorial photo"
+            className="max-h-[85vh] max-w-full rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {photos.length > 1 && (
+            <>
+              <Button
+                size="icon"
+                variant="secondary"
+                aria-label="Previous photo"
+                className="absolute left-3 top-1/2 -translate-y-1/2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  step(-1);
+                }}
+              >
+                <ChevronLeft className="size-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="secondary"
+                aria-label="Next photo"
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  step(1);
+                }}
+              >
+                <ChevronRight className="size-5" />
+              </Button>
+              <p className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-ink/70 px-3 py-1 text-xs text-background">
+                {(openIdx ?? 0) + 1} / {photos.length}
+              </p>
+            </>
+          )}
+
           <div className="absolute right-4 top-4 flex gap-2" onClick={(e) => e.stopPropagation()}>
             <Button size="sm" variant="destructive" onClick={() => remove(open)}>Delete</Button>
-            <Button size="icon" variant="secondary" onClick={() => setOpen(null)}><X className="size-4" /></Button>
+            <Button size="icon" variant="secondary" onClick={() => setOpenIdx(null)}><X className="size-4" /></Button>
           </div>
         </div>
       )}
