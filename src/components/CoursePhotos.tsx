@@ -87,7 +87,6 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           multiple
           className="hidden"
           onChange={(e) => upload(e.target.files)}
