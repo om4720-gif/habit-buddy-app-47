@@ -136,11 +136,12 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
           className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4"
           onClick={() => setOpenIdx(null)}
           onTouchStart={(e) => {
-            touchX.current = e.changedTouches[0].clientX;
+            touchX.current = e.changedTouches[0]?.clientX ?? null;
           }}
           onTouchEnd={(e) => {
-            if (touchX.current == null) return;
-            const dx = e.changedTouches[0].clientX - touchX.current;
+            const endX = e.changedTouches[0]?.clientX;
+            if (touchX.current == null || endX == null) return;
+            const dx = endX - touchX.current;
             touchX.current = null;
             if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1);
           }}
