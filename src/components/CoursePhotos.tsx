@@ -95,9 +95,18 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
       {photos.length > 0 && (
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
           {photos.map((p) => (
-            <button key={p.id} onClick={() => setOpen(p)} className="aspect-square overflow-hidden rounded-lg border border-line">
-              <img src={p.url} alt="Tutorial photo" loading="lazy" className="size-full object-cover" />
-            </button>
+            <div key={p.id} className="group relative aspect-square overflow-hidden rounded-lg border border-line">
+              <button onClick={() => setOpen(p)} className="size-full">
+                <img src={p.url} alt="Tutorial photo" loading="lazy" className="size-full object-cover" />
+              </button>
+              <button
+                onClick={() => remove(p)}
+                aria-label="Delete photo"
+                className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-ink/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
           ))}
         </div>
       )}
