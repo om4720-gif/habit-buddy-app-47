@@ -38,6 +38,7 @@ export type Database = {
           created_at: string
           id: string
           path: string
+          tutorial_no: number | null
           user_id: string
         }
         Insert: {
@@ -45,6 +46,7 @@ export type Database = {
           created_at?: string
           id?: string
           path: string
+          tutorial_no?: number | null
           user_id?: string
         }
         Update: {
@@ -52,6 +54,7 @@ export type Database = {
           created_at?: string
           id?: string
           path?: string
+          tutorial_no?: number | null
           user_id?: string
         }
         Relationships: [
