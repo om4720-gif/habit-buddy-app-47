@@ -32,26 +32,64 @@ export type Database = {
         }
         Relationships: []
       }
-      course_photos: {
+      course_photo_folders: {
         Row: {
           course_id: string
           created_at: string
           id: string
-          path: string
+          name: string
           user_id: string
         }
         Insert: {
           course_id: string
           created_at?: string
           id?: string
-          path: string
+          name: string
           user_id?: string
         }
         Update: {
           course_id?: string
           created_at?: string
           id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_photo_folders_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_photos: {
+        Row: {
+          course_id: string
+          created_at: string
+          folder_name: string | null
+          id: string
+          path: string
+          tutorial_no: number | null
+          user_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          folder_name?: string | null
+          id?: string
+          path: string
+          tutorial_no?: number | null
+          user_id?: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          folder_name?: string | null
+          id?: string
           path?: string
+          tutorial_no?: number | null
           user_id?: string
         }
         Relationships: [

@@ -15,6 +15,20 @@
       "when": 1791386659799,
       "tag": "0001_course_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791451493254,
+      "tag": "0002_add_tutorial_no_to_course_photos",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791451553416,
+      "tag": "0003_add_course_photo_folders",
+      "breakpoints": true
     }
   ]
 }
