@@ -6,35 +6,41 @@ import {
   ChevronLeft,
   ChevronRight,
   Folder,
-  ImageOff,
+  FolderPlus,
   Loader2,
+  Trash2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-type Photo = { id: string; path: string; url: string; tutorial_no: number | null };
-
-const FOLDERS = [1, 2, 3, 4, 5];
-const UNSORTED = 0;
+type Photo = { id: string; path: string; url: string; folder_name: string | null };
+type Folder = { id: string; name: string };
 
 export function CoursePhotos({ courseId }: { courseId: string }) {
   const qc = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const touchX = useRef<number | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [folder, setFolder] = useState<number | null>(null);
+  const [folder, setFolder] = useState<string | null>(null);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const key = ["course-photos", courseId];
+  const foldersKey = ["course-photo-folders", courseId];
 
   const { data: photos = [] } = useQuery({
     queryKey: key,
     queryFn: async (): Promise<Photo[]> => {
       const { data, error } = await supabase
         .from("course_photos")
-        .select("id, path, tutorial_no")
+        .select("id, path, folder_name")
         .eq("course_id", courseId)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -44,17 +50,30 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
         .createSignedUrls(data.map((p) => p.path), 60 * 60);
       return data.map((p, i) => ({
         ...p,
-        tutorial_no: p.tutorial_no ?? null,
+        folder_name: p.folder_name ?? null,
         url: signed?.[i]?.signedUrl ?? "",
       }));
     },
     staleTime: 30 * 60 * 1000,
   });
 
-  const inFolder =
-    folder == null ? [] : photos.filter((p) => (p.tutorial_no ?? UNSORTED) === folder);
+  const { data: folders = [] } = useQuery({
+    queryKey: foldersKey,
+    queryFn: async (): Promise<Folder[]> => {
+      const { data, error } = await supabase
+        .from("course_photo_folders")
+        .select("id, name")
+        .eq("course_id", courseId)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const inFolder = folder == null ? [] : photos.filter((p) => p.folder_name === folder);
   const open = openIdx != null && openIdx < inFolder.length ? inFolder[openIdx] : null;
-  const unsortedCount = photos.filter((p) => p.tutorial_no == null).length;
+  const unsorted = photos.filter((p) => p.folder_name == null);
 
   function step(delta: number) {
     setOpenIdx((i) => {
@@ -74,6 +93,52 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [openIdx, inFolder.length]);
 
+  async function createFolder() {
+    const name = newName.trim();
+    if (!name) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("course_photo_folders")
+        .insert({ course_id: courseId, name });
+      if (error) throw error;
+      setNewName("");
+      setAdding(false);
+      toast.success("Folder created");
+      qc.invalidateQueries({ queryKey: foldersKey });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not create folder");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteFolder() {
+    const name = folder;
+    if (name == null) return;
+    try {
+      const { error } = await supabase
+        .from("course_photo_folders")
+        .delete()
+        .eq("course_id", courseId)
+        .eq("name", name);
+      if (error) throw error;
+      await supabase
+        .from("course_photos")
+        .update({ folder_name: null })
+        .eq("course_id", courseId)
+        .eq("folder_name", name);
+      setFolder(null);
+      toast.success("Folder removed — photos kept");
+      qc.invalidateQueries({ queryKey: foldersKey });
+      qc.invalidateQueries({ queryKey: key });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not remove folder");
+    } finally {
+      setConfirmDelete(false);
+    }
+  }
+
   async function upload(files: FileList | null) {
     if (!files?.length || folder == null) return;
     setUploading(true);
@@ -82,7 +147,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
       if (!u.user) throw new Error("Please sign in");
       for (const file of Array.from(files)) {
         const ext = file.name.split(".").pop() || "jpg";
-        const path = `${u.user.id}/${courseId}/${folder}/${crypto.randomUUID()}.${ext}`;
+        const path = `${u.user.id}/${courseId}/${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from("course-photos")
           .upload(path, file, { contentType: file.type });
@@ -90,7 +155,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
         const { error } = await supabase.from("course_photos").insert({
           course_id: courseId,
           path,
-          tutorial_no: folder === UNSORTED ? null : folder,
+          folder_name: folder,
         });
         if (error) throw error;
       }
@@ -111,13 +176,17 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
     qc.invalidateQueries({ queryKey: key });
   }
 
-  function folderTile(n: number, label: string) {
-    const items = photos.filter((p) => (p.tutorial_no ?? UNSORTED) === n);
+  function tile(name: string, label?: string) {
+    const items =
+      name == null ? unsorted : photos.filter((p) => p.folder_name === name);
     return (
       <button
-        key={n}
-        onClick={() => setFolder(n)}
-        className="group flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-accent/40"
+        key={label ?? name ?? "unsorted"}
+        onClick={() => {
+          setFolder(name);
+          setConfirmDelete(false);
+        }}
+        className="flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-accent/40"
       >
         <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface-2">
           {items[0]?.url ? (
@@ -127,7 +196,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
           )}
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-medium">{label}</span>
+          <span className="block truncate text-sm font-medium">{label ?? name}</span>
           <span className="block text-[11px] text-ink-soft">
             {items.length} {items.length === 1 ? "photo" : "photos"}
           </span>
@@ -139,25 +208,44 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
   return (
     <div className="border-t border-line px-5 py-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
+        <p className="flex min-w-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
           {folder != null && (
             <button
-              onClick={() => setFolder(null)}
+              onClick={() => {
+                setFolder(null);
+                setConfirmDelete(false);
+              }}
               aria-label="Back to folders"
-              className="flex size-6 items-center justify-center rounded-full border border-line text-ink-soft hover:border-accent/40"
+              className="flex size-6 shrink-0 items-center justify-center rounded-full border border-line text-ink-soft hover:border-accent/40"
             >
               <ChevronLeft className="size-3.5" />
             </button>
           )}
-          {folder == null
-            ? `Tutorial photos · ${photos.length}`
-            : `${folder === UNSORTED ? "Unsorted" : `Tutorial ${folder}`} · ${inFolder.length}`}
+          <span className="truncate">
+            {folder ?? `Tutorial photos · ${photos.length}`}
+          </span>
         </p>
         {folder != null && (
-          <Button size="sm" variant="outline" disabled={uploading} onClick={() => inputRef.current?.click()}>
-            {uploading ? <Loader2 className="mr-1 size-4 animate-spin" /> : <Camera className="mr-1 size-4" />}
-            Add photo
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            {confirmDelete ? (
+              <Button size="sm" variant="destructive" onClick={deleteFolder}>
+                Remove folder?
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Remove folder"
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            )}
+            <Button size="sm" variant="outline" disabled={uploading} onClick={() => inputRef.current?.click()}>
+              {uploading ? <Loader2 className="mr-1 size-4 animate-spin" /> : <Camera className="mr-1 size-4" />}
+              Add photo
+            </Button>
+          </div>
         )}
         <input
           ref={inputRef}
@@ -169,24 +257,53 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
         />
       </div>
 
-      {folder == null &&
-        (photos.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-xl border border-dashed border-line px-3 py-4 text-xs text-ink-soft">
-            <ImageOff className="size-4" />
-            No photos yet — open a tutorial folder to add some.
-          </div>
-        ) : (
+      {folder == null && (
+        <>
+          {folders.length === 0 && unsorted.length === 0 && (
+            <p className="mb-3 rounded-xl border border-dashed border-line px-3 py-4 text-xs text-ink-soft">
+              No folders yet — create one like "Tut 1" to start saving photos.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {FOLDERS.map((n) => folderTile(n, `Tut ${n}`))}
-            {unsortedCount > 0 && folderTile(UNSORTED, "Unsorted")}
+            {folders.map((f) => tile(f.name))}
+            {unsorted.length > 0 && tile(null, "Unsorted")}
+            {adding ? (
+              <div className="col-span-full flex items-center gap-2">
+                <Input
+                  autoFocus
+                  value={newName}
+                  placeholder="Folder name, e.g. Tut 1"
+                  className="h-9"
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && createFolder()}
+                />
+                <Button size="sm" disabled={saving || !newName.trim()} onClick={createFolder}>
+                  {saving ? <Loader2 className="size-4 animate-spin" /> : "Create"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setAdding(false); setNewName(""); }}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAdding(true)}
+                className="flex items-center gap-3 rounded-xl border border-dashed border-line px-3 py-2.5 text-left text-sm text-ink-soft transition-colors hover:border-accent/40"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2">
+                  <FolderPlus className="size-4" />
+                </span>
+                New folder
+              </button>
+            )}
           </div>
-        ))}
+        </>
+      )}
 
       {folder != null && (
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
           {inFolder.length === 0 && (
             <p className="col-span-full py-2 text-xs text-ink-soft">
-              Empty — tap "Add photo" to take or pick photos for this tutorial.
+              Empty — tap "Add photo" to take or pick photos for this folder.
             </p>
           )}
           {inFolder.map((p, i) => (
