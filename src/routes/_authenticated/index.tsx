@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { AddHabitModal } from "@/components/AddHabitModal";
+import { MeroBriefing } from "@/components/MeroBriefing";
 import {
   createHabit,
   deleteHabit,
@@ -86,6 +87,8 @@ function DashboardPage() {
           progress={progress}
           onAdd={() => setIsAdding(true)}
         />
+
+        <MeroBriefing date={date} />
 
         <section className="mt-8">
           <div className="flex items-baseline justify-between">
