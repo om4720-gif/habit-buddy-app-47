@@ -173,3 +173,11 @@
 @utility animate-rise {
   animation: rise 0.5s ease-out both;
 }
+
+@keyframes meroFloat {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-10px) rotate(3deg); }
+}
+@utility animate-mero-float {
+  animation: meroFloat 3.2s ease-in-out infinite;
+}

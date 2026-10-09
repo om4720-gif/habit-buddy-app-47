@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouteContext } from "@tanstack/react-router";
 
 import { supabase } from "@/integrations/supabase/client";
+import { MeroFloating } from "@/components/MeroFloating";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -55,6 +56,7 @@ function AppLayout() {
         </div>
       </nav>
       <Outlet />
+      <MeroFloating />
     </div>
   );
 }
