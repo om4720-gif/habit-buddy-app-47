@@ -75,7 +75,7 @@ export const getMeroBriefing = createServerFn({ method: "POST" })
     for (const h of habits.data ?? [])
       lines.push(`- ${h.name}: ${(comps.data ?? []).filter((c) => c.habit_id === h.id).length}/7`);
 
-    const key = process.env.LOVABLE_API_KEY;
+    const key = process.env['LOVABLE_API_KEY'];
     if (!key) throw new Error("AI is not configured.");
     const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
       method: "POST",

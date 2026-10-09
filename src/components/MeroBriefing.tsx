@@ -25,7 +25,7 @@ export function MeroBriefing({ date }: { date: string }) {
   const run = async (a: MeroAction) => {
     try {
       if (a.type === "mark_lecture_studied")
-        await updateLecture({ data: { lectureId: a.id, completed: true } } as never);
+        await updateLecture({ data: { lectureId: a.id, completed: true } });
       else await updateDeadline({ data: { deadlineId: a.id, completed: true } });
       setDone((s) => new Set(s).add(a.id));
       qc.invalidateQueries({ predicate: (x) => x.queryKey[0] !== "mero" });
