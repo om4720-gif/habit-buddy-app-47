@@ -12,4 +12,5 @@
 - [x] Voice input for lecture/tutorial titles
 - [x] Offline mode: cached pages + last-loaded data on phone and desktop
 - [x] Photo viewer: arrows, keyboard and swipe to move between photos
-- [ ] Tutorial photo folders: "New folder" button so the user creates folders, photos saved inside them
+- [x] Tutorial photo folders: "New folder" button so the user creates folders, photos saved inside them
+- [x] "Mero" daily briefing agent: summary of deadlines/progress + one-tap actions
