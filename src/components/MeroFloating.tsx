@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { MeroBriefing } from "@/components/MeroBriefing";
+import { MeroChat } from "@/components/MeroChat";
 
 export function MeroFloating() {
   const [open, setOpen] = useState(false);
@@ -29,8 +30,9 @@ export function MeroFloating() {
             >
               <X className="h-4 w-4" />
             </button>
-            <div className="[&>section]:mt-0 [&>section]:shadow-xl">
+            <div className="rounded-3xl border border-border bg-card p-6 shadow-xl [&>section]:mt-0 [&>section]:border-0 [&>section]:p-0 [&>section]:shadow-none">
               <MeroBriefing date={format(new Date(), "yyyy-MM-dd")} />
+              <MeroChat />
             </div>
           </div>
         </div>
