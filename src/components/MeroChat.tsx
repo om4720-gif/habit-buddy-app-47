@@ -30,7 +30,9 @@ export function MeroChat() {
   const [voiceOn, setVoiceOn] = useState(true);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [msgs, thinking]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [msgs, thinking]);
 
   const send = useCallback(
     async (content: string) => {
