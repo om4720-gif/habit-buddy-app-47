@@ -14,3 +14,4 @@
 - [x] Photo viewer: arrows, keyboard and swipe to move between photos
 - [x] Tutorial photo folders: "New folder" button so the user creates folders, photos saved inside them
 - [x] "Mero" daily briefing agent: summary of deadlines/progress + one-tap actions
+- [x] Talk to Mero by voice (Arabic + English), Mero makes changes
