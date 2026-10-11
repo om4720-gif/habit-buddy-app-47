@@ -87,6 +87,11 @@ function DashboardPage() {
           onAdd={() => setIsAdding(true)}
         />
 
+        <div className="mt-8">
+          <RewardShop />
+        </div>
+
+
         <section className="mt-8">
           <div className="flex items-baseline justify-between">
             <h2 className="font-semibold text-base uppercase tracking-[0.12em] text-ink-soft">
