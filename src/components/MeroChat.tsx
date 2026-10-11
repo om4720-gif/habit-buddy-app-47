@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { askMero } from "@/lib/mero-chat.functions";
 import { useVoiceInput } from "@/lib/useVoiceInput";
+import { useUserSettings } from "@/lib/useUserSettings";
 
 type Msg = { role: "user" | "assistant"; content: string };
 const isArabic = (t: string) => /[\u0600-\u06FF]/.test(t);
@@ -24,6 +25,7 @@ function speak(text: string) {
 
 export function MeroChat() {
   const qc = useQueryClient();
+  const agent = useUserSettings().settings.agent_name;
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [thinking, setThinking] = useState(false);
@@ -61,9 +63,9 @@ export function MeroChat() {
   return (
     <div className="mt-4 border-t border-border pt-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">Talk to Mero · تكلم مع ميرو</p>
+        <p className="text-sm font-medium">Talk to {agent}{agent === "Mero" ? " · تكلم مع ميرو" : ""}</p>
         <button
-          aria-label={voiceOn ? "Mute Mero" : "Unmute Mero"}
+          aria-label={voiceOn ? `Mute ${agent}` : `Unmute ${agent}`}
           onClick={() => { setVoiceOn((v) => !v); window.speechSynthesis?.cancel(); }}
           className="rounded-full p-1 text-ink-soft hover:bg-muted"
         >
@@ -92,7 +94,7 @@ export function MeroChat() {
         ))}
         {thinking && (
           <p className="flex items-center gap-2 text-xs text-ink-soft">
-            <Loader2 className="h-3 w-3 animate-spin" /> Mero is thinking…
+            <Loader2 className="h-3 w-3 animate-spin" /> {agent} is thinking…
           </p>
         )}
         <div ref={endRef} />
@@ -107,7 +109,7 @@ export function MeroChat() {
           size="icon"
           onClick={toggle}
           disabled={busy || thinking}
-          aria-label={recording ? "Stop and send" : "Speak to Mero"}
+          aria-label={recording ? "Stop and send" : `Speak to ${agent}`}
           className={`h-11 w-11 shrink-0 rounded-full ${recording ? "animate-pulse bg-destructive text-destructive-foreground" : ""}`}
         >
           {busy ? <Loader2 className="animate-spin" /> : recording ? <Square /> : <Mic />}

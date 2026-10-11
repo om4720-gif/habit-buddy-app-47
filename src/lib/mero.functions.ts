@@ -45,6 +45,7 @@ export const getMeroBriefing = createServerFn({ method: "POST" })
   .validator((d) => z.object({ today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(d))
   .handler(async ({ data, context }): Promise<MeroBriefing> => {
     const sb = context.supabase;
+    const agentName = (await sb.from("user_settings").select("agent_name").maybeSingle()).data?.agent_name || "Mero";
     const [courses, lectures, deadlines, habits, comps] = await Promise.all([
       sb.from("courses").select("id, name"),
       sb.from("lectures").select("id, course_id, title, kind, completed"),
@@ -86,7 +87,7 @@ export const getMeroBriefing = createServerFn({ method: "POST" })
         store: false,
         reasoning: { effort: "low" },
         instructions:
-          "You are Mero, a warm, concise study coach for a university student. Write a daily briefing from their data. greeting: one short line signed as Mero. summary: 2-4 sentences on what's urgent (overdue, due today/tomorrow/this week) and overall progress. focus: 3-5 short, specific to-dos for today in priority order. actions: up to 4 one-tap changes the student would likely want (mark an assignment/quiz done, or mark a lecture/tutorial studied), using ONLY ids given in the data; label like 'Mark Physics Lecture 3 studied'. Never invent deadlines.",
+          `You are ${agentName}, a warm, concise study coach for a university student. Write a daily briefing from their data. greeting: one short line signed as Mero. summary: 2-4 sentences on what's urgent (overdue, due today/tomorrow/this week) and overall progress. focus: 3-5 short, specific to-dos for today in priority order. actions: up to 4 one-tap changes the student would likely want (mark an assignment/quiz done, or mark a lecture/tutorial studied), using ONLY ids given in the data; label like 'Mark Physics Lecture 3 studied'. Never invent deadlines.",
         input: lines.join("\n"),
         text: { format: { type: "json_schema", name: "briefing", strict: true, schema } },
       }),

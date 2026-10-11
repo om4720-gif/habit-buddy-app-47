@@ -5,10 +5,12 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { updateDeadline } from "@/lib/deadlines.functions";
+import { useUserSettings } from "@/lib/useUserSettings";
 import { getMeroBriefing, type MeroAction } from "@/lib/mero.functions";
 import { updateLecture } from "@/lib/uni.functions";
 
 export function MeroBriefing({ date }: { date: string }) {
+  const agent = useUserSettings().settings.agent_name;
   const qc = useQueryClient();
   const [enabled, setEnabled] = useState(false);
   const [done, setDone] = useState<Set<string>>(new Set());
@@ -40,10 +42,10 @@ export function MeroBriefing({ date }: { date: string }) {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-full bg-primary font-display text-lg font-semibold text-primary-foreground">
-            M
+            {agent.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h2 className="font-semibold">Mero</h2>
+            <h2 className="font-semibold">{agent}</h2>
             <p className="text-xs text-ink-soft">Your daily briefing</p>
           </div>
         </div>
@@ -61,7 +63,7 @@ export function MeroBriefing({ date }: { date: string }) {
       )}
       {q.isFetching && !q.data && (
         <p className="mt-4 flex items-center gap-2 text-sm text-ink-soft">
-          <Loader2 className="h-4 w-4 animate-spin" /> Mero is looking at your deadlines…
+          <Loader2 className="h-4 w-4 animate-spin" /> {agent} is looking at your deadlines…
         </p>
       )}
       {q.error && (

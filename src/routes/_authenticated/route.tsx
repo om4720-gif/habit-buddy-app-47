@@ -2,6 +2,8 @@ import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouteContext }
 
 import { supabase } from "@/integrations/supabase/client";
 import { MeroFloating } from "@/components/MeroFloating";
+import { SettingsDialog } from "@/components/SettingsDialog";
+import { useUserSettings } from "@/lib/useUserSettings";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -40,6 +42,7 @@ const navItems = [
 ];
 
 function AppLayout() {
+  const { settings } = useUserSettings();
   return (
     <div className="min-h-screen bg-background">
       <nav className="sticky top-0 z-40 border-b border-line bg-background/95 backdrop-blur-sm">
@@ -49,8 +52,9 @@ function AppLayout() {
           </Link>
           <div className="flex items-center gap-1">
             {navItems.map((item) => (
-              <NavLink key={item.to} to={item.to} label={item.label} />
+              <NavLink key={item.to} to={item.to} label={item.to === "/german" ? settings.habit_page_name : item.label} />
             ))}
+            <SettingsDialog />
             <SignOut />
           </div>
         </div>
