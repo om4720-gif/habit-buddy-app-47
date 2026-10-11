@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedCityRouteImport } from './routes/_authenticated/city'
 import { Route as AuthenticatedGermanRouteImport } from './routes/_authenticated/german'
 import { Route as AuthenticatedUniRouteImport } from './routes/_authenticated/uni'
 import { Route as ApiPublicClaudeRouteImport } from './routes/api/public/claude'
@@ -29,11 +28,6 @@ const AuthRoute = AuthRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedCityRoute = AuthenticatedCityRouteImport.update({
-  id: '/city',
-  path: '/city',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedGermanRoute = AuthenticatedGermanRouteImport.update({
@@ -55,14 +49,12 @@ const ApiPublicClaudeRoute = ApiPublicClaudeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
-  '/city': typeof AuthenticatedCityRoute
   '/german': typeof AuthenticatedGermanRoute
   '/uni': typeof AuthenticatedUniRoute
   '/api/public/claude': typeof ApiPublicClaudeRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
-  '/city': typeof AuthenticatedCityRoute
   '/german': typeof AuthenticatedGermanRoute
   '/uni': typeof AuthenticatedUniRoute
   '/': typeof AuthenticatedIndexRoute
@@ -72,7 +64,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/_authenticated/city': typeof AuthenticatedCityRoute
   '/_authenticated/german': typeof AuthenticatedGermanRoute
   '/_authenticated/uni': typeof AuthenticatedUniRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -80,14 +71,13 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/city' | '/german' | '/uni' | '/api/public/claude'
+  fullPaths: '/' | '/auth' | '/german' | '/uni' | '/api/public/claude'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/city' | '/german' | '/uni' | '/' | '/api/public/claude'
+  to: '/auth' | '/german' | '/uni' | '/' | '/api/public/claude'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
-    | '/_authenticated/city'
     | '/_authenticated/german'
     | '/_authenticated/uni'
     | '/_authenticated/'
@@ -123,13 +113,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/city': {
-      id: '/_authenticated/city'
-      path: '/city'
-      fullPath: '/city'
-      preLoaderRoute: typeof AuthenticatedCityRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/german': {
       id: '/_authenticated/german'
       path: '/german'
@@ -155,14 +138,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedCityRoute: typeof AuthenticatedCityRoute
   AuthenticatedGermanRoute: typeof AuthenticatedGermanRoute
   AuthenticatedUniRoute: typeof AuthenticatedUniRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedCityRoute: AuthenticatedCityRoute,
   AuthenticatedGermanRoute: AuthenticatedGermanRoute,
   AuthenticatedUniRoute: AuthenticatedUniRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
