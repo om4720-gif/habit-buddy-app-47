@@ -1,0 +1,126 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Gift, Plus, Sparkles, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
+import { getCityProgress } from "@/lib/city.functions";
+
+export function RewardShop() {
+  const qc = useQueryClient();
+  const earned = useQuery({ queryKey: ["points"], queryFn: () => getCityProgress() });
+  const shop = useQuery({
+    queryKey: ["reward-shop"],
+    queryFn: async () => {
+      const [r, h] = await Promise.all([
+        supabase.from("rewards").select("id, title, cost").order("cost"),
+        supabase.from("reward_redemptions").select("id, title, cost, created_at").order("created_at", { ascending: false }),
+      ]);
+      if (r.error) throw r.error;
+      if (h.error) throw h.error;
+      return { rewards: r.data, history: h.data };
+    },
+  });
+  const [title, setTitle] = useState("");
+  const [cost, setCost] = useState("100");
+
+  const total = earned.data?.total ?? 0;
+  const spent = (shop.data?.history ?? []).reduce((s, r) => s + r.cost, 0);
+  const balance = total - spent;
+  const refresh = () => qc.invalidateQueries({ queryKey: ["reward-shop"] });
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const c = parseInt(cost, 10);
+    if (!title.trim() || !(c > 0)) return;
+    const { error } = await supabase.from("rewards").insert({ title: title.trim().slice(0, 60), cost: c } as never);
+    if (error) { toast.error("Could not add reward"); return; }
+    setTitle("");
+    refresh();
+  };
+
+  const redeem = async (r: { title: string; cost: number }) => {
+    if (r.cost > balance) return;
+    const { error } = await supabase.from("reward_redemptions").insert({ title: r.title, cost: r.cost } as never);
+    if (error) { toast.error("Could not redeem"); return; }
+    toast.success(`🎉 Enjoy your ${r.title}! You earned it.`);
+    refresh();
+  };
+
+  const remove = async (id: string) => {
+    await supabase.from("rewards").delete().eq("id", id);
+    refresh();
+  };
+
+  return (
+    <section className="mb-8 rounded-3xl border border-line bg-card p-6 shadow-sm">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-rust">
+            <Sparkles className="size-3.5" /> Points wallet
+          </p>
+          <p className="mt-1 font-display text-4xl text-ink">{balance}</p>
+          <p className="text-xs text-ink-soft">
+            {total} earned · {spent} spent
+          </p>
+        </div>
+        <p className="max-w-xs text-xs text-ink-soft">
+          Habits +5 · Lectures +10 · Assignments +20 · Finishing early earns bonus points. Spend them on treats you set yourself.
+        </p>
+      </div>
+
+      <h3 className="mt-6 flex items-center gap-2 font-display text-lg text-ink">
+        <Gift className="size-4 text-rust" /> Reward shop
+      </h3>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {(shop.data?.rewards ?? []).map((r) => {
+          const pct = Math.min(100, Math.round((balance / r.cost) * 100));
+          const ready = balance >= r.cost;
+          return (
+            <div key={r.id} className="rounded-2xl border border-line p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-medium text-ink">{r.title}</p>
+                  <p className="text-xs text-ink-soft">{r.cost} pts</p>
+                </div>
+                <button aria-label="Remove reward" onClick={() => remove(r.id)} className="text-ink-soft hover:text-ink">
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-rust transition-all" style={{ width: `${pct}%` }} />
+              </div>
+              <Button size="sm" className="mt-3 w-full rounded-full" disabled={!ready} onClick={() => redeem(r)}>
+                {ready ? "Redeem" : `${r.cost - balance} pts to go`}
+              </Button>
+            </div>
+          );
+        })}
+        {shop.data?.rewards.length === 0 && (
+          <p className="text-sm text-ink-soft sm:col-span-2">
+            Add your first treat — a movie night, a coffee, a day off.
+          </p>
+        )}
+      </div>
+
+      <form onSubmit={add} className="mt-4 flex gap-2">
+        <Input placeholder="New reward, e.g. Movie night" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <Input className="w-24" type="number" min={1} value={cost} onChange={(e) => setCost(e.target.value)} aria-label="Cost in points" />
+        <Button type="submit" size="icon" aria-label="Add reward"><Plus /></Button>
+      </form>
+
+      {(shop.data?.history.length ?? 0) > 0 && (
+        <div className="mt-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">Recently enjoyed</p>
+          <ul className="mt-2 space-y-1 text-sm text-ink-soft">
+            {shop.data!.history.slice(0, 5).map((h) => (
+              <li key={h.id}>🎁 {h.title} · −{h.cost}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
