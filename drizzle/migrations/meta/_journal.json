@@ -29,6 +29,13 @@
       "when": 1791451553416,
       "tag": "0003_add_course_photo_folders",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791706772047,
+      "tag": "0004_user_settings",
+      "breakpoints": true
     }
   ]
 }

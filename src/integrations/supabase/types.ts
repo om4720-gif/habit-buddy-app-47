@@ -285,6 +285,27 @@ export type Database = {
           },
         ]
       }
+      user_settings: {
+        Row: {
+          agent_name: string
+          habit_page_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_name?: string
+          habit_page_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          agent_name?: string
+          habit_page_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
