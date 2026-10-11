@@ -36,7 +36,7 @@ export function RewardShop() {
     const c = parseInt(cost, 10);
     if (!title.trim() || !(c > 0)) return;
     const { error } = await supabase.from("rewards").insert({ title: title.trim().slice(0, 60), cost: c } as never);
-    if (error) return toast.error("Could not add reward");
+    if (error) { toast.error("Could not add reward"); return; }
     setTitle("");
     refresh();
   };
@@ -44,7 +44,7 @@ export function RewardShop() {
   const redeem = async (r: { title: string; cost: number }) => {
     if (r.cost > balance) return;
     const { error } = await supabase.from("reward_redemptions").insert({ title: r.title, cost: r.cost } as never);
-    if (error) return toast.error("Could not redeem");
+    if (error) { toast.error("Could not redeem"); return; }
     toast.success(`🎉 Enjoy your ${r.title}! You earned it.`);
     refresh();
   };
