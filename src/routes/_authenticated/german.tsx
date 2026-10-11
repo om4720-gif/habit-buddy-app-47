@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { createHabit, getHabitsForDate, toggleCompletion } from "@/lib/habits.functions";
 import { AddHabitModal } from "@/components/AddHabitModal";
 import { Button } from "@/components/ui/button";
+import { useUserSettings } from "@/lib/useUserSettings";
 
 export const Route = createFileRoute("/_authenticated/german")({
   component: GermanPage,
@@ -17,6 +18,9 @@ const today = format(new Date(), "yyyy-MM-dd");
 
 function GermanPage() {
   const queryClient = useQueryClient();
+  const { settings } = useUserSettings();
+  const name = settings.habit_page_name;
+  const isGerman = name.toLowerCase() === "german";
 
   const { data: habits = [] } = useQuery({
     queryKey: ["habits", today, "german"],
@@ -46,11 +50,11 @@ function GermanPage() {
         <div className="flex items-center gap-2 text-rust">
           <BookOpen className="size-5" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">
-            German Learning
+            {isGerman ? "German Learning" : name}
           </span>
         </div>
         <h1 className="mt-2 font-display text-3xl font-medium text-ink sm:text-4xl">
-          Deutsch heute
+          {isGerman ? "Deutsch heute" : `${name} today`}
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
           Small daily rituals build fluency.
@@ -89,13 +93,13 @@ function GermanPage() {
           onClick={() => setIsAddOpen(true)}
           className="rounded-full bg-ink text-cream hover:bg-ink/90"
         >
-          <Plus className="mr-1 size-4" /> Add German habit
+          <Plus className="mr-1 size-4" /> Add {isGerman ? "German" : name} habit
         </Button>
       </section>
 
       {habits.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-card p-10 text-center">
-          <p className="text-sm text-ink-soft">No German habits yet.</p>
+          <p className="text-sm text-ink-soft">No {isGerman ? "German" : name} habits yet.</p>
           <Button
             variant="ghost"
             onClick={() => setIsAddOpen(true)}
