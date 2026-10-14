@@ -1,11 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
 export const transcribeAudio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
-        audioBase64: z.string().min(100),
+        // ~28M base64 chars ≈ 20 MB of audio; reject bigger payloads before decoding.
+        audioBase64: z.string().min(100).max(28_000_000),
       })
       .parse(data)
   )
