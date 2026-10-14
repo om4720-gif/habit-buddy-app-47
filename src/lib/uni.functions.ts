@@ -24,18 +24,47 @@ export const createCourse = createServerFn({ method: "POST" })
         name: z.string().min(1).max(200),
         code: z.string().max(100).optional(),
         color: z.string().max(50).optional(),
+        // Optional: pre-create "Lecture 1..n" and "Tutorial 1..n" with the course.
+        lectureCount: z.number().int().min(0).max(60).optional(),
+        tutorialCount: z.number().int().min(0).max(60).optional(),
       })
       .parse(data)
   )
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
-    const { error } = await supabase.from("courses").insert({
-      name: data.name,
-      code: data.code ?? null,
-      color: data.color ?? "#CE552F",
-    } as never);
-    if (error) throw new Error(error.message);
-    return { success: true };
+    const { data: course, error } = await supabase
+      .from("courses")
+      .insert({
+        name: data.name,
+        code: data.code ?? null,
+        color: data.color ?? "#CE552F",
+      } as never)
+      .select("id")
+      .single();
+    if (error || !course) throw new Error(error?.message ?? "Could not create course");
+
+    const courseId = (course as { id: string }).id;
+    const rows = [
+      ...Array.from({ length: data.lectureCount ?? 0 }, (_, i) => ({
+        course_id: courseId,
+        title: `Lecture ${i + 1}`,
+        kind: "lecture",
+      })),
+      ...Array.from({ length: data.tutorialCount ?? 0 }, (_, i) => ({
+        course_id: courseId,
+        title: `Tutorial ${i + 1}`,
+        kind: "tutorial",
+      })),
+    ];
+    if (rows.length > 0) {
+      const { error: bulkError } = await supabase.from("lectures").insert(rows as never);
+      if (bulkError) {
+        // Don't leave a half-created course behind.
+        await supabase.from("courses").delete().eq("id", courseId);
+        throw new Error(bulkError.message);
+      }
+    }
+    return { success: true, courseId };
   });
 
 export const updateCourse = createServerFn({ method: "POST" })

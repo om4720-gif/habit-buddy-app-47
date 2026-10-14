@@ -76,7 +76,7 @@ function UniPage() {
   const [courseDialogOpen, setCourseDialogOpen] = useState(false);
   const [lectureDialogOpen, setLectureDialogOpen] = useState(false);
   const [lectureCourseId, setLectureCourseId] = useState<string>("");
-  const [courseForm, setCourseForm] = useState({ name: "", code: "" });
+  const [courseForm, setCourseForm] = useState({ name: "", code: "", lectures: "", tutorials: "" });
   const [lectureForm, setLectureForm] = useState({
     title: "",
     kind: "lecture" as "lecture" | "tutorial",
@@ -207,13 +207,25 @@ function UniPage() {
   async function handleAddCourse(e: React.FormEvent) {
     e.preventDefault();
     try {
+      const lectureCount = Math.min(60, Math.max(0, parseInt(courseForm.lectures, 10) || 0));
+      const tutorialCount = Math.min(60, Math.max(0, parseInt(courseForm.tutorials, 10) || 0));
       await createCourseFn({
-        data: { name: courseForm.name, code: courseForm.code || undefined },
+        data: {
+          name: courseForm.name,
+          code: courseForm.code || undefined,
+          lectureCount,
+          tutorialCount,
+        },
       });
-      setCourseForm({ name: "", code: "" });
+      setCourseForm({ name: "", code: "", lectures: "", tutorials: "" });
       setCourseDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["courses"] });
-      toast.success("Course added");
+      queryClient.invalidateQueries({ queryKey: ["lectures"] });
+      toast.success(
+        lectureCount || tutorialCount
+          ? `Course added with ${lectureCount} lectures and ${tutorialCount} tutorials`
+          : "Course added",
+      );
     } catch (err) {
       toast.error("Could not add course");
     }
@@ -790,6 +802,47 @@ function UniPage() {
                   className="mt-1 rounded-xl border-line bg-background text-ink"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="courseLectures" className="text-ink-soft">
+                    Lectures
+                  </Label>
+                  <Input
+                    id="courseLectures"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={60}
+                    placeholder="0"
+                    value={courseForm.lectures}
+                    onChange={(e) =>
+                      setCourseForm({ ...courseForm, lectures: e.target.value })
+                    }
+                    className="mt-1 rounded-xl border-line bg-background text-ink"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="courseTutorials" className="text-ink-soft">
+                    Tutorials
+                  </Label>
+                  <Input
+                    id="courseTutorials"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={60}
+                    placeholder="0"
+                    value={courseForm.tutorials}
+                    onChange={(e) =>
+                      setCourseForm({ ...courseForm, tutorials: e.target.value })
+                    }
+                    className="mt-1 rounded-xl border-line bg-background text-ink"
+                  />
+                </div>
+              </div>
+              <p className="-mt-2 text-xs text-ink-soft">
+                Optional. Creates Lecture 1…n and Tutorial 1…n for you.
+              </p>
               <Button
                 type="submit"
                 className="w-full rounded-full bg-rust text-cream hover:bg-rust/90"
@@ -822,7 +875,8 @@ function UniPage() {
                 .sort(
                   (a, b) =>
                     new Date(a.lecture_date ?? 0).getTime() -
-                    new Date(b.lecture_date ?? 0).getTime()
+                      new Date(b.lecture_date ?? 0).getTime() ||
+                    a.title.localeCompare(b.title, undefined, { numeric: true })
                 );
             const groups: {
               kind: "lecture" | "tutorial";
