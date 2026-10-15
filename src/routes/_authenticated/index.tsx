@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { Buddy, type BuddyMood } from "@/components/Buddy";
 import { PointsChip, RewardsDialog, useRewards } from "@/components/RewardShop";
 import { AddHabitModal } from "@/components/AddHabitModal";
 import {
@@ -241,6 +242,8 @@ function ProgressCard({
   const circumference = 2 * Math.PI * 30;
   const offset = circumference * (1 - progress);
   const left = total - completed;
+  const mood: BuddyMood =
+    total === 0 ? "wave" : left === 0 ? "party" : completed === 0 ? "ready" : "happy";
   const headline =
     total === 0
       ? "Start your ritual"
@@ -259,7 +262,10 @@ function ProgressCard({
           : "Nice rhythm. Keep it loose.";
 
   return (
-    <section className="mt-8 rounded-3xl bg-gradient-to-br from-cream to-sand/70 p-6 shadow-sm ring-1 ring-black/5 sm:p-7">
+    <section className="relative mt-16 rounded-3xl bg-gradient-to-br from-cream to-sand/70 p-6 shadow-sm ring-1 ring-black/5 sm:p-7">
+      <div className="absolute -top-[72px] right-5 z-10 sm:right-8">
+        <Buddy mood={mood} completed={completed} total={total} />
+      </div>
       <div className="flex flex-wrap items-center gap-5">
         <div className="relative grid size-24 shrink-0 place-items-center">
           <svg viewBox="0 0 72 72" className="size-24 -rotate-90">

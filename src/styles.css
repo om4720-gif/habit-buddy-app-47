@@ -181,3 +181,27 @@
 @utility animate-mero-float {
   animation: meroFloat 3.2s ease-in-out infinite;
 }
+
+/* ---- Buddy mascot ---- */
+@keyframes buddyBob { 0%,100% { transform: translateY(0) scale(1,1); } 50% { transform: translateY(-2px) scale(1.012,.985); } }
+@keyframes buddyParty { 0%,100% { transform: translateY(0) scale(1,1); } 35% { transform: translateY(-9px) scale(.97,1.04); } 60% { transform: translateY(0) scale(1.04,.96); } }
+@keyframes buddyHop { 0% { transform: translateY(0) scale(1.08,.9); } 30% { transform: translateY(-24px) scale(.95,1.08); } 55% { transform: translateY(0) scale(1.1,.88); } 75% { transform: translateY(-7px) scale(1); } 100% { transform: translateY(0) scale(1,1); } }
+@keyframes buddyBlink { 0%,92%,100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes buddyWingIdle { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(5deg); } }
+@keyframes buddyWingUp { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-28deg); } }
+@keyframes buddyWave { 0%,100% { transform: rotate(0deg); } 25% { transform: rotate(-40deg); } 50% { transform: rotate(-8deg); } 75% { transform: rotate(-40deg); } }
+@keyframes buddyConfetti { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(80px) rotate(420deg); opacity: 0; } }
+@keyframes buddyTwinkle { 0%,100% { opacity: 0; transform: scale(.4); } 50% { opacity: 1; transform: scale(1.15); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .buddy-bob { animation: buddyBob 3.2s ease-in-out infinite; transform-origin: 50px 92px; }
+  .buddy-party { animation: buddyParty 1s ease-in-out infinite; transform-origin: 50px 92px; }
+  .buddy-hop { animation: buddyHop .95s cubic-bezier(.3,.7,.4,1) 1; transform-origin: 50px 92px; }
+  .buddy-blink { animation: buddyBlink 4.6s infinite; transform-box: fill-box; transform-origin: center; }
+  .buddy-wing-l, .buddy-wing-r { animation: buddyWingIdle 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 15%; }
+  .buddy-wing-up-l, .buddy-wing-up-r { animation: buddyWingUp .5s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 85%; }
+  .buddy-wing-up-r { animation-direction: reverse; }
+  .buddy-wave { animation: buddyWave 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 85%; }
+  .buddy-confetti { animation: buddyConfetti 1.1s ease-out both; transform-box: fill-box; transform-origin: center; }
+  .buddy-twinkle { animation: buddyTwinkle 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+}
