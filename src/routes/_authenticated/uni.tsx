@@ -146,7 +146,7 @@ function UniPage() {
   async function toggleDeadline(deadlineId: string, completed: boolean) {
     try {
       await updateDeadlineFn({ data: { deadlineId, completed: !completed } });
-      if (!completed) toast.success("Nice! Points added to your city 🏙️");
+      if (!completed) toast.success("Nice! Bricks added to your city 🧱🏙️");
       queryClient.invalidateQueries({ queryKey: ["deadlines"] });
     } catch {
       toast.error("Could not update deadline");
