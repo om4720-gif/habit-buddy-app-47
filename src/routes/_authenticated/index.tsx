@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { format, subDays } from "date-fns";
-import { Flame, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { Flame, MoreHorizontal, Plus, Trash2, Volume2, VolumeX } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import {
   updateHabit,
 } from "@/lib/habits.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { isSoundOn, playAllDone, playTick, setSoundOn } from "@/lib/sounds";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -38,6 +39,7 @@ function DashboardPage() {
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [showRewards, setShowRewards] = useState(false);
+  const [soundOn, setSoundOnState] = useState(isSoundOn);
   const { balance } = useRewards();
 
   const { data: habits, isPending: habitsPending } = useQuery({
@@ -59,7 +61,20 @@ function DashboardPage() {
   const totalCount = habits?.length ?? 0;
   const progress = totalCount > 0 ? completedCount / totalCount : 0;
 
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundOnState(next);
+    if (next) playTick();
+  };
+
   const handleToggle = async (habitId: string) => {
+    // Play instantly on tick (not on un-tick) so it feels snappy.
+    const wasDone = habits?.find((h) => h.id === habitId)?.completed;
+    if (!wasDone) {
+      if (totalCount > 0 && completedCount + 1 === totalCount) playAllDone();
+      else playTick();
+    }
     try {
       await toggleCompletion({ data: { habitId, date } });
       queryClient.invalidateQueries({ queryKey: ["habits", date] });
@@ -83,6 +98,8 @@ function DashboardPage() {
           date={date}
           streak={stats?.longestStreak ?? 0}
           balance={balance}
+          soundOn={soundOn}
+          onToggleSound={toggleSound}
           onOpenRewards={() => setShowRewards(true)}
           onSignOut={handleSignOut}
         />
@@ -170,12 +187,16 @@ function Header({
   date,
   streak,
   balance,
+  soundOn,
+  onToggleSound,
   onOpenRewards,
   onSignOut,
 }: {
   date: string;
   streak: number;
   balance: number;
+  soundOn: boolean;
+  onToggleSound: () => void;
   onOpenRewards: () => void;
   onSignOut: () => void;
 }) {
@@ -196,6 +217,14 @@ function Header({
             {streak}
           </span>
           <PointsChip balance={balance} onClick={onOpenRewards} />
+          <button
+            onClick={onToggleSound}
+            className="grid size-9 place-items-center rounded-full text-ink-soft transition hover:bg-sand hover:text-ink"
+            aria-label={soundOn ? "Mute sounds" : "Unmute sounds"}
+            title={soundOn ? "Sound on" : "Sound off"}
+          >
+            {soundOn ? <Volume2 className="size-[18px]" /> : <VolumeX className="size-[18px]" />}
+          </button>
           <button
             onClick={onSignOut}
             className="grid size-9 place-items-center rounded-full text-ink-soft transition hover:bg-sand hover:text-ink"
