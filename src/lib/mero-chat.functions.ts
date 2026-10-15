@@ -49,8 +49,12 @@ export const askMero = createServerFn({ method: "POST" })
       lines.push(`- ${h.name} ${doneToday.has(h.id) ? "done today" : "not done today"} [habit_id=${h.id}]`);
 
     let changed = false;
+    const toolErrors: string[] = [];
     const ok = (error: { message: string } | null) => {
-      if (error) return { ok: false, error: error.message };
+      if (error) {
+        toolErrors.push(error.message);
+        return { ok: false, error: error.message };
+      }
       changed = true;
       return { ok: true };
     };
@@ -104,7 +108,11 @@ export const askMero = createServerFn({ method: "POST" })
       );
     };
 
-    const run = async (model: LanguageModel, providerOptions?: Record<string, Record<string, unknown>>) => {
+    const run = async (
+      model: LanguageModel,
+      providerOptions?: Record<string, Record<string, unknown>>,
+      singleStep = false,
+    ) => {
       let streamError: unknown;
       const result = streamText({
         model,
@@ -116,7 +124,10 @@ export const askMero = createServerFn({ method: "POST" })
           lines.join("\n"),
         messages: data.messages,
         tools,
-        stopWhen: stepCountIs(50),
+        // Fallback runs one step: Gemini 3 rejects the follow-up request that carries tool
+        // results unless its "thought signature" is echoed back, which the OpenAI-compatible
+        // layer can't do. Actions still run; we confirm them ourselves below.
+        stopWhen: stepCountIs(singleStep ? 1 : 50),
         ...(providerOptions ? { providerOptions: providerOptions as never } : {}),
       });
       try {
@@ -129,7 +140,7 @@ export const askMero = createServerFn({ method: "POST" })
     const runFallback = () => {
       if (!fallback) throw new Error("AI is not configured.");
       const p = createOpenAI({ baseURL: fallback.baseURL, apiKey: fallback.apiKey });
-      return run(p.chat(fallback.model));
+      return run(p.chat(fallback.model), undefined, true);
     };
 
     try {
@@ -162,7 +173,14 @@ export const askMero = createServerFn({ method: "POST" })
       } else {
         reply = await runFallback();
       }
-      return { reply: reply || "Done.", changed };
+      if (!reply) {
+        const lastUser = [...data.messages].reverse().find((m) => m.role === "user");
+        const ar = /[\u0600-\u06FF]/.test(String((lastUser as { content?: unknown } | undefined)?.content ?? ""));
+        reply = toolErrors.length
+          ? ar ? "معرفتش أنفذ ده، جرب تاني." : "Sorry, I couldn't do that. Please try again."
+          : ar ? "تمام، خلصت." : "Done.";
+      }
+      return { reply, changed };
     } catch (e) {
       console.error("Mero chat failed:", e);
       const status = statusOf(e);
