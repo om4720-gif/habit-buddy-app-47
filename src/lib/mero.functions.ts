@@ -2,6 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  getFallbackAI,
+  isOutOfCredits,
+  markPrimaryDown,
+  primaryIsDown,
+} from "@/lib/ai-fallback.server";
 
 export type MeroAction = {
   type: "mark_lecture_studied" | "mark_deadline_done";
@@ -76,54 +82,94 @@ export const getMeroBriefing = createServerFn({ method: "POST" })
     for (const h of habits.data ?? [])
       lines.push(`- ${h.name}: ${(comps.data ?? []).filter((c) => c.habit_id === h.id).length}/7`);
 
+    const instructions =
+      `You are ${agentName}, a warm, concise study coach for a university student. Write a daily briefing from their data. greeting: one short line signed as ${agentName}. summary: 2-4 sentences on what's urgent (overdue, due today/tomorrow/this week) and overall progress. focus: 3-5 short, specific to-dos for today in priority order. actions: up to 4 one-tap changes the student would likely want (mark an assignment/quiz done, or mark a lecture/tutorial studied), using ONLY ids given in the data; label like 'Mark Physics Lecture 3 studied'. Never invent deadlines.`;
+    const input = lines.join("\n");
+
     const key = process.env['LOVABLE_API_KEY'];
-    if (!key) throw new Error("AI is not configured.");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": key, "X-Lovable-AIG-SDK": "fetch" },
-      body: JSON.stringify({
-        model: "openai/gpt-6-astra",
-        stream: true,
-        store: false,
-        reasoning: { effort: "low" },
-        instructions:
-          `You are ${agentName}, a warm, concise study coach for a university student. Write a daily briefing from their data. greeting: one short line signed as ${agentName}. summary: 2-4 sentences on what's urgent (overdue, due today/tomorrow/this week) and overall progress. focus: 3-5 short, specific to-dos for today in priority order. actions: up to 4 one-tap changes the student would likely want (mark an assignment/quiz done, or mark a lecture/tutorial studied), using ONLY ids given in the data; label like 'Mark Physics Lecture 3 studied'. Never invent deadlines.`,
-        input: lines.join("\n"),
-        text: { format: { type: "json_schema", name: "briefing", strict: true, schema } },
-      }),
-    });
-    if (!res.ok || !res.body) {
-      const msg = await res.text().catch(() => "");
-      if (res.status === 402) throw new Error("Out of AI credits — add credits to keep using Mero.");
-      if (res.status === 429) throw new Error("Mero is busy right now. Try again in a minute.");
-      throw new Error(`Mero couldn't write a briefing (${res.status}). ${msg.slice(0, 200)}`);
-    }
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
+    const fallback = getFallbackAI();
     let text = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let i;
-      while ((i = buf.indexOf("\n")) >= 0) {
-        const line = buf.slice(0, i).trim();
-        buf = buf.slice(i + 1);
-        if (!line.startsWith("data:")) continue;
-        const p = line.slice(5).trim();
-        if (!p || p === "[DONE]") continue;
-        try {
-          const ev = JSON.parse(p);
-          if (ev.type === "response.output_text.delta") text += ev.delta;
-          if (ev.type === "error" || ev.type === "response.failed")
-            throw new Error(ev.error?.message ?? ev.response?.error?.message ?? "Mero failed.");
-        } catch (e) {
-          if (e instanceof SyntaxError) continue;
-          throw e;
+    let useFallback = !key || (!!fallback && primaryIsDown());
+
+    if (!useFallback) {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Lovable-API-Key": key!, "X-Lovable-AIG-SDK": "fetch" },
+        body: JSON.stringify({
+          model: "openai/gpt-6-astra",
+          stream: true,
+          store: false,
+          reasoning: { effort: "low" },
+          instructions,
+          input,
+          text: { format: { type: "json_schema", name: "briefing", strict: true, schema } },
+        }),
+      });
+      if (!res.ok || !res.body) {
+        const msg = await res.text().catch(() => "");
+        if (fallback && isOutOfCredits(res.status)) {
+          markPrimaryDown();
+          useFallback = true;
+        } else {
+          if (res.status === 402) throw new Error("Out of AI credits — add credits (or set FALLBACK_AI_API_KEY for a free fallback) to keep using Mero.");
+          if (res.status === 429) throw new Error("Mero is busy right now. Try again in a minute.");
+          throw new Error(`Mero couldn't write a briefing (${res.status}). ${msg.slice(0, 200)}`);
+        }
+      } else {
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf("\n")) >= 0) {
+            const line = buf.slice(0, i).trim();
+            buf = buf.slice(i + 1);
+            if (!line.startsWith("data:")) continue;
+            const p = line.slice(5).trim();
+            if (!p || p === "[DONE]") continue;
+            try {
+              const ev = JSON.parse(p);
+              if (ev.type === "response.output_text.delta") text += ev.delta;
+              if (ev.type === "error" || ev.type === "response.failed")
+                throw new Error(ev.error?.message ?? ev.response?.error?.message ?? "Mero failed.");
+            } catch (e) {
+              if (e instanceof SyntaxError) continue;
+              throw e;
+            }
+          }
         }
       }
     }
+
+    if (useFallback) {
+      if (!fallback) throw new Error("AI is not configured.");
+      const res = await fetch(`${fallback.baseURL.replace(/\/$/, "")}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${fallback.apiKey}` },
+        body: JSON.stringify({
+          model: fallback.model,
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content: `${instructions}\n\nReply with ONLY a JSON object matching this JSON Schema, no markdown: ${JSON.stringify(schema)}`,
+            },
+            { role: "user", content: input },
+          ],
+        }),
+      });
+      if (!res.ok) {
+        if (res.status === 429) throw new Error("Mero is busy right now. Try again in a minute.");
+        const msg = await res.text().catch(() => "");
+        throw new Error(`Mero couldn't write a briefing (${res.status}). ${msg.slice(0, 200)}`);
+      }
+      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      text = json.choices?.[0]?.message?.content ?? "";
+    }
+    text = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
     const out = JSON.parse(text) as MeroBriefing;
     const lecIds = new Set(lec.filter((l) => !l.completed).map((l) => l.id));
     const dlIds = new Set(dl.filter((d) => !d.completed).map((d) => d.id));

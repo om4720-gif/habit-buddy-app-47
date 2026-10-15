@@ -24,3 +24,19 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Free AI fallback for Mero
+
+If the Lovable AI gateway runs out of credits, Mero can fall back to any OpenAI-compatible
+provider. The easiest free option is a Google AI Studio (Gemini API) key.
+
+Set these as secrets for the project:
+
+| Variable | Required | Default |
+|---|---|---|
+| `FALLBACK_AI_API_KEY` | yes | — |
+| `FALLBACK_AI_BASE_URL` | no | `https://generativelanguage.googleapis.com/v1beta/openai/` |
+| `FALLBACK_AI_MODEL` | no | `gemini-3.5-flash` |
+
+Note: on Google's free tier, prompts may be used to improve their models, and Mero's prompts
+include your course, deadline and habit names.

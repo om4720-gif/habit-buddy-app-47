@@ -1,9 +1,15 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { createServerFn } from "@tanstack/react-start";
-import { stepCountIs, streamText, tool } from "ai";
+import { stepCountIs, streamText, tool, type LanguageModel } from "ai";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  getFallbackAI,
+  isOutOfCredits,
+  markPrimaryDown,
+  primaryIsDown,
+} from "@/lib/ai-fallback.server";
 
 const msgSchema = z.object({
   today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -85,37 +91,62 @@ export const askMero = createServerFn({ method: "POST" })
     };
 
     const key = process.env["LOVABLE_API_KEY"];
-    if (!key) throw new Error("AI is not configured.");
-    const provider = createOpenAI({
-      baseURL: "https://ai.gateway.lovable.dev/v1",
-      apiKey: key,
-      headers: { "Lovable-API-Key": key, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
-    });
+    const fallback = getFallbackAI();
 
-    try {
+    const run = async (model: LanguageModel, providerOptions?: Record<string, Record<string, unknown>>) => {
       const result = streamText({
-        model: provider.responses("openai/gpt-6-astra"),
+        model,
         instructions:
           `You are ${agentName}, a warm voice assistant and study coach for a university student. Replies are read aloud, so keep them short (1-3 sentences), no markdown, no lists, no ids. ALWAYS reply in the same language the user spoke (Arabic, including Egyptian dialect, or English). When the user says they finished/studied something or did a habit, call the right tool with the exact id from the data, then confirm briefly. Match courses and items flexibly (e.g. 'lecture two' = 'Lecture 2' or 'L2'; Arabic course names may be spoken in Arabic). If ambiguous, ask a short question. Never invent ids.\n\nDATA:\n` +
           lines.join("\n"),
         messages: data.messages,
         tools,
         stopWhen: stepCountIs(50),
-        providerOptions: {
-          openai: {
-            store: false,
-            forceReasoning: true,
-            reasoningEffort: "low",
-            reasoningSummary: "auto",
-            include: ["reasoning.encrypted_content"],
-          },
-        },
+        ...(providerOptions ? { providerOptions: providerOptions as never } : {}),
       });
-      const reply = (await result.text).trim();
+      return (await result.text).trim();
+    };
+
+    const runFallback = () => {
+      if (!fallback) throw new Error("AI is not configured.");
+      const p = createOpenAI({ baseURL: fallback.baseURL, apiKey: fallback.apiKey });
+      return run(p.chat(fallback.model));
+    };
+
+    try {
+      let reply: string;
+      if (key && !(fallback && primaryIsDown())) {
+        const provider = createOpenAI({
+          baseURL: "https://ai.gateway.lovable.dev/v1",
+          apiKey: key,
+          headers: { "Lovable-API-Key": key, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
+        });
+        try {
+          reply = await run(provider.responses("openai/gpt-6-astra"), {
+            openai: {
+              store: false,
+              forceReasoning: true,
+              reasoningEffort: "low",
+              reasoningSummary: "auto",
+              include: ["reasoning.encrypted_content"],
+            },
+          });
+        } catch (e) {
+          // Out of credits before anything ran: switch to the free fallback if configured.
+          if (fallback && !changed && isOutOfCredits((e as { statusCode?: number }).statusCode)) {
+            markPrimaryDown();
+            reply = await runFallback();
+          } else {
+            throw e;
+          }
+        }
+      } else {
+        reply = await runFallback();
+      }
       return { reply: reply || "Done.", changed };
     } catch (e) {
       const status = (e as { statusCode?: number }).statusCode;
-      if (status === 402) throw new Error("Out of AI credits — add credits to keep talking to Mero.");
+      if (status === 402) throw new Error("Out of AI credits — add credits (or set FALLBACK_AI_API_KEY for a free fallback) to keep talking to Mero.");
       if (status === 429) throw new Error("Mero is busy right now. Try again in a minute.");
       throw new Error(e instanceof Error ? e.message : "Mero couldn't answer.");
     }
