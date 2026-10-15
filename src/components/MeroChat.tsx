@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { askMero } from "@/lib/mero-chat.functions";
-import { useVoiceInput } from "@/lib/useVoiceInput";
+import { getVoiceLang, setVoiceLang, useVoiceInput, type VoiceLang } from "@/lib/useVoiceInput";
 import { useUserSettings } from "@/lib/useUserSettings";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -59,11 +59,25 @@ export function MeroChat() {
   );
 
   const { recording, busy, toggle } = useVoiceInput(send);
+  const [voiceLang, setLang] = useState<VoiceLang>(getVoiceLang);
 
   return (
     <div className="mt-4 border-t border-border pt-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium">Talk to {agent}{agent === "Mero" ? " · تكلم مع ميرو" : ""}</p>
+        <button
+          type="button"
+          aria-label="Switch speaking language"
+          title="Language you speak"
+          onClick={() => {
+            const next: VoiceLang = voiceLang === "en-US" ? "ar-EG" : "en-US";
+            setVoiceLang(next);
+            setLang(next);
+          }}
+          className="ml-auto mr-1 rounded-full border border-border px-2 py-0.5 text-xs text-ink-soft hover:bg-muted"
+        >
+          {voiceLang === "en-US" ? "EN" : "ع"}
+        </button>
         <button
           aria-label={voiceOn ? `Mute ${agent}` : `Unmute ${agent}`}
           onClick={() => { setVoiceOn((v) => !v); window.speechSynthesis?.cancel(); }}
