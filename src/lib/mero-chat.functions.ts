@@ -93,9 +93,24 @@ export const askMero = createServerFn({ method: "POST" })
     const key = process.env["LOVABLE_API_KEY"];
     const fallback = getFallbackAI();
 
+    // streamText reports API failures through the stream; awaiting .text then only
+    // throws a generic "No output generated" error. Keep the real error instead.
+    const statusOf = (e: unknown): number | undefined => {
+      const x = e as { statusCode?: number; lastError?: unknown; cause?: unknown } | undefined;
+      return (
+        x?.statusCode ??
+        (x?.lastError ? statusOf(x.lastError) : undefined) ??
+        (x?.cause ? statusOf(x.cause) : undefined)
+      );
+    };
+
     const run = async (model: LanguageModel, providerOptions?: Record<string, Record<string, unknown>>) => {
+      let streamError: unknown;
       const result = streamText({
         model,
+        onError: ({ error }) => {
+          streamError = error;
+        },
         instructions:
           `You are ${agentName}, a warm voice assistant and study coach for a university student. Replies are read aloud, so keep them short (1-3 sentences), no markdown, no lists, no ids. ALWAYS reply in the same language the user spoke (Arabic, including Egyptian dialect, or English). When the user says they finished/studied something or did a habit, call the right tool with the exact id from the data, then confirm briefly. Match courses and items flexibly (e.g. 'lecture two' = 'Lecture 2' or 'L2'; Arabic course names may be spoken in Arabic). If ambiguous, ask a short question. Never invent ids.\n\nDATA:\n` +
           lines.join("\n"),
@@ -104,7 +119,11 @@ export const askMero = createServerFn({ method: "POST" })
         stopWhen: stepCountIs(50),
         ...(providerOptions ? { providerOptions: providerOptions as never } : {}),
       });
-      return (await result.text).trim();
+      try {
+        return (await result.text).trim();
+      } catch (e) {
+        throw streamError ?? e;
+      }
     };
 
     const runFallback = () => {
@@ -133,7 +152,7 @@ export const askMero = createServerFn({ method: "POST" })
           });
         } catch (e) {
           // Out of credits before anything ran: switch to the free fallback if configured.
-          if (fallback && !changed && isOutOfCredits((e as { statusCode?: number }).statusCode)) {
+          if (fallback && !changed && isOutOfCredits(statusOf(e))) {
             markPrimaryDown();
             reply = await runFallback();
           } else {
@@ -145,7 +164,8 @@ export const askMero = createServerFn({ method: "POST" })
       }
       return { reply: reply || "Done.", changed };
     } catch (e) {
-      const status = (e as { statusCode?: number }).statusCode;
+      console.error("Mero chat failed:", e);
+      const status = statusOf(e);
       if (status === 402) throw new Error("Out of AI credits — add credits (or set FALLBACK_AI_API_KEY for a free fallback) to keep talking to Mero.");
       if (status === 429) throw new Error("Mero is busy right now. Try again in a minute.");
       throw new Error(e instanceof Error ? e.message : "Mero couldn't answer.");
