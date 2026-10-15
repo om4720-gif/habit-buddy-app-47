@@ -146,8 +146,9 @@ function UniPage() {
   async function toggleDeadline(deadlineId: string, completed: boolean) {
     try {
       await updateDeadlineFn({ data: { deadlineId, completed: !completed } });
-      if (!completed) toast.success("Nice! Bricks added to your city 🧱🏙️");
+      if (!completed) toast.success("Nice! Points added ✨");
       queryClient.invalidateQueries({ queryKey: ["deadlines"] });
+      queryClient.invalidateQueries({ queryKey: ["points"] });
     } catch {
       toast.error("Could not update deadline");
     }
@@ -269,6 +270,7 @@ function UniPage() {
     try {
       await updateLectureFn({ data: { lectureId, completed: !completed } });
       queryClient.invalidateQueries({ queryKey: ["lectures"] });
+      queryClient.invalidateQueries({ queryKey: ["points"] });
     } catch (err) {
       toast.error("Could not update lecture");
     }

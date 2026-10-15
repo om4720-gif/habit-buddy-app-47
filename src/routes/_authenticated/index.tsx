@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { format, subDays } from "date-fns";
-import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { Flame, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { RewardShop } from "@/components/RewardShop";
+import { PointsChip, RewardsDialog, useRewards } from "@/components/RewardShop";
 import { AddHabitModal } from "@/components/AddHabitModal";
 import {
   createHabit,
@@ -36,6 +36,8 @@ function DashboardPage() {
   const date = today();
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
+  const [showRewards, setShowRewards] = useState(false);
+  const { balance } = useRewards();
 
   const { data: habits, isPending: habitsPending } = useQuery({
     queryKey: ["habits", date],
@@ -62,6 +64,7 @@ function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: ["habits", date] });
       queryClient.invalidateQueries({ queryKey: ["stats", date] });
       queryClient.invalidateQueries({ queryKey: ["weekly", date] });
+      queryClient.invalidateQueries({ queryKey: ["points"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update habit.");
     }
@@ -74,10 +77,12 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-ink">
-      <div className="mx-auto max-w-4xl px-6 py-8 sm:px-8 sm:py-12 animate-rise">
+      <div className="mx-auto max-w-3xl px-5 py-8 sm:px-8 sm:py-14 animate-rise">
         <Header
           date={date}
           streak={stats?.longestStreak ?? 0}
+          balance={balance}
+          onOpenRewards={() => setShowRewards(true)}
           onSignOut={handleSignOut}
         />
 
@@ -88,28 +93,13 @@ function DashboardPage() {
           onAdd={() => setIsAdding(true)}
         />
 
-        <div className="mt-8">
-          <RewardShop />
-        </div>
-
-
-        <section className="mt-8">
-          <div className="flex items-baseline justify-between">
-            <h2 className="font-semibold text-base uppercase tracking-[0.12em] text-ink-soft">
-              Today's habits
-            </h2>
-            <span className="text-xs text-ink-soft tabular-nums">
-              {completedCount} of {totalCount} done
-            </span>
-          </div>
+        <section className="mt-10">
+          <SectionTitle title="Today" meta={`${completedCount} of ${totalCount} done`} />
 
           {habitsPending ? (
             <div className="mt-4 space-y-3">
               {[...Array(3)].map((_, i) => (
-                <div
-                  key={i}
-                  className="h-16 animate-pulse rounded-2xl bg-cream"
-                />
+                <div key={i} className="h-16 animate-pulse rounded-2xl bg-cream" />
               ))}
             </div>
           ) : habits && habits.length > 0 ? (
@@ -137,14 +127,14 @@ function DashboardPage() {
           )}
         </section>
 
-        <WeeklyProgress days={weekly ?? []} isPending={weeklyPending} />
-
-        <StatsGrid
+        <WeekAndStats
+          days={weekly ?? []}
+          isPending={weeklyPending}
           longestStreak={stats?.longestStreak ?? 0}
           longestStreakHabit={stats?.longestStreakHabit ?? "—"}
           consistencyRate={stats?.consistencyRate ?? 0}
           activeHabitCount={stats?.activeHabitCount ?? 0}
-          isPending={statsPending}
+          statsPending={statsPending}
         />
       </div>
 
@@ -160,6 +150,17 @@ function DashboardPage() {
           }}
         />
       )}
+
+      {showRewards && <RewardsDialog onClose={() => setShowRewards(false)} />}
+    </div>
+  );
+}
+
+function SectionTitle({ title, meta }: { title: string; meta?: string }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">{title}</h2>
+      {meta ? <span className="text-xs tabular-nums text-ink-soft">{meta}</span> : null}
     </div>
   );
 }
@@ -167,57 +168,61 @@ function DashboardPage() {
 function Header({
   date,
   streak,
+  balance,
+  onOpenRewards,
   onSignOut,
 }: {
   date: string;
   streak: number;
+  balance: number;
+  onOpenRewards: () => void;
   onSignOut: () => void;
 }) {
   const displayDate = format(new Date(`${date}T00:00:00`), "EEEE, MMMM d");
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
-    <header className="flex items-start justify-between gap-4">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-rust">
-          Ritual
-        </p>
-        <h1 className="font-display mt-2 text-3xl font-semibold leading-tight text-balance sm:text-4xl">
-          {displayDate}
-        </h1>
-        <p className="mt-2 max-w-md text-sm text-ink-soft text-pretty sm:text-base">
-          Small acts, stamped daily. Keep the rhythm loose.
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-3">
-        <div className="text-right">
-          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-ink-soft">
-            Best streak
-          </p>
-          <p className="font-display text-xl font-semibold tabular-nums">{streak}</p>
-        </div>
-        <button
-          onClick={onSignOut}
-          className="grid size-11 place-items-center rounded-full bg-cream text-xs font-semibold text-rust ring-1 ring-black/5 transition hover:bg-sand"
-          aria-label="Sign out"
-          title="Sign out"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+    <header>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-rust">Ritual</p>
+        <div className="flex items-center gap-2">
+          <span
+            title="Best streak"
+            className="inline-flex items-center gap-1.5 rounded-full bg-cream px-3.5 py-2 text-sm font-semibold tabular-nums ring-1 ring-black/5"
           >
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" x2="9" y1="12" y2="12" />
-          </svg>
-        </button>
+            <Flame className="size-4 text-rust" />
+            {streak}
+          </span>
+          <PointsChip balance={balance} onClick={onOpenRewards} />
+          <button
+            onClick={onSignOut}
+            className="grid size-9 place-items-center rounded-full text-ink-soft transition hover:bg-sand hover:text-ink"
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" x2="9" y1="12" y2="12" />
+            </svg>
+          </button>
+        </div>
       </div>
+      <h1 className="font-display mt-6 text-4xl font-semibold leading-tight text-balance sm:text-5xl">
+        {greeting}
+      </h1>
+      <p className="mt-1.5 text-base text-ink-soft">{displayDate}</p>
     </header>
   );
 }
@@ -235,18 +240,35 @@ function ProgressCard({
 }) {
   const circumference = 2 * Math.PI * 30;
   const offset = circumference * (1 - progress);
+  const left = total - completed;
+  const headline =
+    total === 0
+      ? "Start your ritual"
+      : left === 0
+        ? "All habits stamped"
+        : completed === 0
+          ? `${left} habit${left === 1 ? "" : "s"} to stamp today`
+          : `${left} more to go`;
+  const sub =
+    total === 0
+      ? "Add one small habit to begin."
+      : left === 0
+        ? "A quiet, complete day. Tomorrow is a fresh page."
+        : completed === 0
+          ? "Start with the easiest one."
+          : "Nice rhythm. Keep it loose.";
 
   return (
-    <section className="mt-8 rounded-2xl bg-cream p-5 ring-1 ring-black/5 sm:p-6">
-      <div className="flex items-center gap-5">
-        <div className="relative grid size-20 shrink-0 place-items-center">
-          <svg viewBox="0 0 72 72" className="size-20 -rotate-90">
+    <section className="mt-8 rounded-3xl bg-gradient-to-br from-cream to-sand/70 p-6 shadow-sm ring-1 ring-black/5 sm:p-7">
+      <div className="flex flex-wrap items-center gap-5">
+        <div className="relative grid size-24 shrink-0 place-items-center">
+          <svg viewBox="0 0 72 72" className="size-24 -rotate-90">
             <circle
               cx="36"
               cy="36"
               r="30"
               fill="none"
-              className="text-sand"
+              className="text-paper"
               stroke="currentColor"
               strokeWidth="6"
             />
@@ -264,26 +286,20 @@ function ProgressCard({
               style={{ animation: "ringFill 0.8s ease-out 0.1s both" }}
             />
           </svg>
-          <span className="absolute font-display text-lg font-semibold tabular-nums">
+          <span className="absolute font-display text-xl font-semibold tabular-nums">
             {completed}
-            <span className="text-ink-soft text-sm">/{total || 1}</span>
+            <span className="text-sm text-ink-soft">/{total}</span>
           </span>
         </div>
-        <div className="min-w-0">
-          <p className="font-display max-w-md text-lg font-semibold leading-tight text-balance">
-            {completed === total
-              ? "All habits stamped"
-              : `${total - completed} habit${total - completed === 1 ? "" : "s"} to stamp`}
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-xl font-semibold leading-tight text-balance sm:text-2xl">
+            {headline}
           </p>
-          <p className="mt-1 max-w-md text-sm text-ink-soft text-pretty">
-            {completed === total
-              ? "A quiet, complete day. Tomorrow is a fresh page."
-              : "You're on pace for a steady week. Keep the rhythm loose."}
-          </p>
+          <p className="mt-1 text-sm text-ink-soft text-pretty">{sub}</p>
         </div>
         <button
           onClick={onAdd}
-          className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-rust px-4 py-2 text-sm font-semibold text-cream ring-1 ring-rust/40 transition hover:bg-rust/90"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-rust px-4 py-2.5 text-sm font-semibold text-cream ring-1 ring-rust/40 transition hover:bg-rust/90"
         >
           <Plus className="size-4" />
           Add habit
@@ -308,14 +324,18 @@ function HabitRow({
 
   return (
     <>
-      <li className="flex items-center gap-4 rounded-2xl bg-cream p-4 ring-1 ring-black/5">
+      <li
+        className={`flex items-center gap-4 rounded-2xl bg-cream p-4 ring-1 ring-black/5 transition hover:shadow-sm ${
+          habit.completed ? "opacity-70" : ""
+        }`}
+      >
         <button
           onClick={onToggle}
           aria-label={`Mark ${habit.name} as ${habit.completed ? "not done" : "done"}`}
-          className={`grid size-7 shrink-0 place-items-center rounded-full transition ${
+          className={`grid size-8 shrink-0 place-items-center rounded-full transition ${
             habit.completed
               ? "bg-rust text-cream stamp-check"
-              : "border-2 border-line text-transparent hover:border-rust"
+              : "border-2 border-line text-transparent hover:border-rust hover:text-rust/40"
           }`}
         >
           <span className="font-display text-sm leading-none font-semibold">✓</span>
@@ -329,19 +349,25 @@ function HabitRow({
             {habit.name}
           </p>
           {habit.description ? (
-            <p className="text-xs text-ink-soft">{habit.description}</p>
+            <p className="mt-0.5 truncate text-xs text-ink-soft">{habit.description}</p>
           ) : null}
-          <p className="text-xs text-ink-soft">{habit.streak} day streak</p>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setIsEditing(true)}
-            className="grid size-8 place-items-center rounded-full text-ink-soft transition hover:bg-sand hover:text-ink"
-            aria-label="Edit habit"
+        {habit.streak > 0 ? (
+          <span
+            title={`${habit.streak} day streak`}
+            className="inline-flex items-center gap-1 rounded-full bg-paper px-2.5 py-1 text-xs font-semibold tabular-nums text-ink-soft"
           >
-            <MoreHorizontal className="size-4" />
-          </button>
-        </div>
+            <Flame className="size-3.5 text-rust" />
+            {habit.streak}
+          </span>
+        ) : null}
+        <button
+          onClick={() => setIsEditing(true)}
+          className="grid size-8 place-items-center rounded-full text-ink-soft transition hover:bg-sand hover:text-ink"
+          aria-label="Edit habit"
+        >
+          <MoreHorizontal className="size-4" />
+        </button>
       </li>
 
       {isEditing && (
@@ -380,12 +406,22 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-function WeeklyProgress({
+function WeekAndStats({
   days,
   isPending,
+  longestStreak,
+  longestStreakHabit,
+  consistencyRate,
+  activeHabitCount,
+  statsPending,
 }: {
   days: Awaited<ReturnType<typeof getWeeklyProgress>>;
   isPending: boolean;
+  longestStreak: number;
+  longestStreakHabit: string;
+  consistencyRate: number;
+  activeHabitCount: number;
+  statsPending: boolean;
 }) {
   const completionRate =
     days.length > 0 && days[0]!.total > 0
@@ -396,110 +432,72 @@ function WeeklyProgress({
         )
       : 0;
 
-  return (
-    <section className="mt-8">
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-semibold text-base uppercase tracking-[0.12em] text-ink-soft">
-          This week
-        </h2>
-        <span className="text-xs text-ink-soft tabular-nums">
-          {isPending ? "—" : `${completionRate}% complete`}
-        </span>
-      </div>
-      <div className="mt-4 rounded-2xl bg-cream p-5 ring-1 ring-black/5">
-        {isPending ? (
-          <div className="h-24 animate-pulse rounded-xl bg-paper" />
-        ) : (
-          <>
-            <div className="grid grid-cols-7 gap-2 sm:gap-3">
-              {days.map((day) => {
-                const date = new Date(`${day.date}T00:00:00`);
-                const label = format(date, "EEE").slice(0, 1);
-                const isToday = day.date === today();
-                const filled =
-                  day.total > 0
-                    ? Array.from({ length: day.total }, (_, i) =>
-                        i < day.completed ? "rust" : "sand"
-                      )
-                    : ["sand"];
-
-                return (
-                  <div key={day.date} className="flex flex-col items-center gap-2">
-                    <span
-                      className={`text-[11px] font-medium ${
-                        isToday ? "text-rust" : "text-ink-soft"
-                      }`}
-                    >
-                      {label}
-                    </span>
-                    <div className="grid grid-cols-1 gap-1">
-                      {filled.map((color, i) => (
-                        <span
-                          key={i}
-                          className={`size-2.5 rounded-full ${
-                            color === "rust" ? "bg-rust" : "bg-sand"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-5 flex items-center gap-4 border-t border-line pt-4">
-              <span className="flex items-center gap-2 text-xs text-ink-soft">
-                <span className="size-2.5 rounded-full bg-rust" /> Stamped
-              </span>
-              <span className="flex items-center gap-2 text-xs text-ink-soft">
-                <span className="size-2.5 rounded-full bg-sand" /> Missed
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function StatsGrid({
-  longestStreak,
-  longestStreakHabit,
-  consistencyRate,
-  activeHabitCount,
-  isPending,
-}: {
-  longestStreak: number;
-  longestStreakHabit: string;
-  consistencyRate: number;
-  activeHabitCount: number;
-  isPending: boolean;
-}) {
-  const cards = [
-    { label: "Longest streak", value: longestStreak, sub: longestStreakHabit },
-    { label: "This month", value: `${consistencyRate}%`, sub: "Consistency rate" },
-    { label: "Active habits", value: activeHabitCount, sub: "In practice now" },
+  const stats = [
+    { label: "Best streak", value: longestStreak, title: longestStreakHabit },
+    { label: "This month", value: `${consistencyRate}%`, title: "Consistency rate" },
+    { label: "Active", value: activeHabitCount, title: "Habits in practice now" },
   ];
 
   return (
-    <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-      {cards.map((card) => (
-        <div
-          key={card.label}
-          className="rounded-2xl bg-cream p-5 ring-1 ring-black/5"
-        >
-          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-ink-soft">
-            {card.label}
-          </p>
-          <p className="font-display mt-2 text-2xl font-semibold tabular-nums">
-            {isPending ? "—" : card.value}
-          </p>
-          <p className="text-xs text-ink-soft">{card.sub}</p>
+    <section className="mt-10">
+      <SectionTitle title="This week" meta={isPending ? "—" : `${completionRate}% complete`} />
+      <div className="mt-4 rounded-3xl bg-cream p-5 ring-1 ring-black/5 sm:p-6">
+        {isPending ? (
+          <div className="h-24 animate-pulse rounded-xl bg-paper" />
+        ) : (
+          <div className="grid grid-cols-7 gap-2 sm:gap-3">
+            {days.map((day) => {
+              const date = new Date(`${day.date}T00:00:00`);
+              const label = format(date, "EEE").slice(0, 1);
+              const isToday = day.date === today();
+              const filled =
+                day.total > 0
+                  ? Array.from({ length: day.total }, (_, i) =>
+                      i < day.completed ? "rust" : "sand"
+                    )
+                  : ["sand"];
+
+              return (
+                <div key={day.date} className="flex flex-col items-center gap-2">
+                  <span
+                    className={`text-[11px] font-semibold ${
+                      isToday ? "text-rust" : "text-ink-soft"
+                    }`}
+                  >
+                    {label}
+                  </span>
+                  <div className="grid grid-cols-1 gap-1">
+                    {filled.map((color, i) => (
+                      <span
+                        key={i}
+                        className={`size-3 rounded-full ${
+                          color === "rust" ? "bg-rust" : "bg-sand"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-6 grid grid-cols-3 divide-x divide-line border-t border-line pt-5">
+          {stats.map((stat) => (
+            <div key={stat.label} title={stat.title} className="px-3 first:pl-0 last:pr-0">
+              <p className="font-display text-2xl font-semibold tabular-nums">
+                {statsPending ? "—" : stat.value}
+              </p>
+              <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-ink-soft">
+                {stat.label}
+              </p>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
     </section>
   );
 }
-
 
 function EditHabitModal({
   habit,
