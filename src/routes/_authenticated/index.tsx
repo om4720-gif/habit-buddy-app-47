@@ -6,6 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Buddy, type BuddyMood } from "@/components/Buddy";
+import { HabitTracker } from "@/components/HabitTracker";
+import { habitColor } from "@/lib/habitColors";
 import { PointsChip, RewardsDialog, useRewards } from "@/components/RewardShop";
 import { AddHabitModal } from "@/components/AddHabitModal";
 import {
@@ -13,7 +15,6 @@ import {
   deleteHabit,
   getHabitsForDate,
   getStats,
-  getWeeklyProgress,
   toggleCompletion,
   updateHabit,
 } from "@/lib/habits.functions";
@@ -52,11 +53,6 @@ function DashboardPage() {
     queryFn: () => getStats({ data: { date } }),
   });
 
-  const { data: weekly, isPending: weeklyPending } = useQuery({
-    queryKey: ["weekly", date],
-    queryFn: () => getWeeklyProgress({ data: { date } }),
-  });
-
   const completedCount = habits?.filter((h) => h.completed).length ?? 0;
   const totalCount = habits?.length ?? 0;
   const progress = totalCount > 0 ? completedCount / totalCount : 0;
@@ -79,7 +75,7 @@ function DashboardPage() {
       await toggleCompletion({ data: { habitId, date } });
       queryClient.invalidateQueries({ queryKey: ["habits", date] });
       queryClient.invalidateQueries({ queryKey: ["stats", date] });
-      queryClient.invalidateQueries({ queryKey: ["weekly", date] });
+      queryClient.invalidateQueries({ queryKey: ["habit-history"] });
       queryClient.invalidateQueries({ queryKey: ["points"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update habit.");
@@ -122,10 +118,11 @@ function DashboardPage() {
             </div>
           ) : habits && habits.length > 0 ? (
             <ul className="mt-4 space-y-3">
-              {habits.map((habit) => (
+              {habits.map((habit, i) => (
                 <HabitRow
                   key={habit.id}
                   habit={habit}
+                  color={habitColor(i)}
                   onToggle={() => handleToggle(habit.id)}
                   onUpdate={async (updates) => {
                     await updateHabit({ data: { habitId: habit.id, ...updates } });
@@ -135,7 +132,7 @@ function DashboardPage() {
                     await deleteHabit({ data: { habitId: habit.id } });
                     queryClient.invalidateQueries({ queryKey: ["habits", date] });
                     queryClient.invalidateQueries({ queryKey: ["stats", date] });
-                    queryClient.invalidateQueries({ queryKey: ["weekly", date] });
+                    queryClient.invalidateQueries({ queryKey: ["habit-history"] });
                   }}
                 />
               ))}
@@ -145,14 +142,17 @@ function DashboardPage() {
           )}
         </section>
 
-        <WeekAndStats
-          days={weekly ?? []}
-          isPending={weeklyPending}
-          longestStreak={stats?.longestStreak ?? 0}
-          longestStreakHabit={stats?.longestStreakHabit ?? "—"}
-          consistencyRate={stats?.consistencyRate ?? 0}
-          activeHabitCount={stats?.activeHabitCount ?? 0}
-          statsPending={statsPending}
+        <HabitTracker
+          date={date}
+          footer={
+            <StatsRow
+              longestStreak={stats?.longestStreak ?? 0}
+              longestStreakHabit={stats?.longestStreakHabit ?? "—"}
+              consistencyRate={stats?.consistencyRate ?? 0}
+              activeHabitCount={stats?.activeHabitCount ?? 0}
+              statsPending={statsPending}
+            />
+          }
         />
       </div>
 
@@ -163,7 +163,7 @@ function DashboardPage() {
             await createHabit({ data: values });
             queryClient.invalidateQueries({ queryKey: ["habits", date] });
             queryClient.invalidateQueries({ queryKey: ["stats", date] });
-            queryClient.invalidateQueries({ queryKey: ["weekly", date] });
+            queryClient.invalidateQueries({ queryKey: ["habit-history"] });
             setIsAdding(false);
           }}
         />
@@ -346,11 +346,13 @@ function ProgressCard({
 
 function HabitRow({
   habit,
+  color,
   onToggle,
   onUpdate,
   onDelete,
 }: {
   habit: Awaited<ReturnType<typeof getHabitsForDate>>[number];
+  color: string;
   onToggle: () => void;
   onUpdate: (updates: { name?: string; description?: string }) => void;
   onDelete: () => void;
@@ -367,11 +369,14 @@ function HabitRow({
         <button
           onClick={onToggle}
           aria-label={`Mark ${habit.name} as ${habit.completed ? "not done" : "done"}`}
-          className={`grid size-8 shrink-0 place-items-center rounded-full transition ${
-            habit.completed
-              ? "bg-rust text-cream stamp-check"
-              : "border-2 border-line text-transparent hover:border-rust hover:text-rust/40"
+          className={`grid size-8 shrink-0 place-items-center rounded-full border-2 transition ${
+            habit.completed ? "stamp-check text-cream" : "text-transparent"
           }`}
+          style={
+            habit.completed
+              ? { backgroundColor: color, borderColor: color }
+              : { borderColor: `${color}66`, color: `${color}66` }
+          }
         >
           <span className="font-display text-sm leading-none font-semibold">✓</span>
         </button>
@@ -441,32 +446,19 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-function WeekAndStats({
-  days,
-  isPending,
+function StatsRow({
   longestStreak,
   longestStreakHabit,
   consistencyRate,
   activeHabitCount,
   statsPending,
 }: {
-  days: Awaited<ReturnType<typeof getWeeklyProgress>>;
-  isPending: boolean;
   longestStreak: number;
   longestStreakHabit: string;
   consistencyRate: number;
   activeHabitCount: number;
   statsPending: boolean;
 }) {
-  const completionRate =
-    days.length > 0 && days[0]!.total > 0
-      ? Math.round(
-          (days.reduce((acc, d) => acc + d.completed, 0) /
-            (days[0]!.total * days.length)) *
-            100
-        )
-      : 0;
-
   const stats = [
     { label: "Best streak", value: longestStreak, title: longestStreakHabit },
     { label: "This month", value: `${consistencyRate}%`, title: "Consistency rate" },
@@ -474,63 +466,14 @@ function WeekAndStats({
   ];
 
   return (
-    <section className="mt-10">
-      <SectionTitle title="This week" meta={isPending ? "—" : `${completionRate}% complete`} />
-      <div className="mt-4 rounded-3xl bg-cream p-5 ring-1 ring-black/5 sm:p-6">
-        {isPending ? (
-          <div className="h-24 animate-pulse rounded-xl bg-paper" />
-        ) : (
-          <div className="grid grid-cols-7 gap-2 sm:gap-3">
-            {days.map((day) => {
-              const date = new Date(`${day.date}T00:00:00`);
-              const label = format(date, "EEE").slice(0, 1);
-              const isToday = day.date === today();
-              const filled =
-                day.total > 0
-                  ? Array.from({ length: day.total }, (_, i) =>
-                      i < day.completed ? "rust" : "sand"
-                    )
-                  : ["sand"];
-
-              return (
-                <div key={day.date} className="flex flex-col items-center gap-2">
-                  <span
-                    className={`text-[11px] font-semibold ${
-                      isToday ? "text-rust" : "text-ink-soft"
-                    }`}
-                  >
-                    {label}
-                  </span>
-                  <div className="grid grid-cols-1 gap-1">
-                    {filled.map((color, i) => (
-                      <span
-                        key={i}
-                        className={`size-3 rounded-full ${
-                          color === "rust" ? "bg-rust" : "bg-sand"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="mt-6 grid grid-cols-3 divide-x divide-line border-t border-line pt-5">
-          {stats.map((stat) => (
-            <div key={stat.label} title={stat.title} className="px-3 first:pl-0 last:pr-0">
-              <p className="font-display text-2xl font-semibold tabular-nums">
-                {statsPending ? "—" : stat.value}
-              </p>
-              <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-ink-soft">
-                {stat.label}
-              </p>
-            </div>
-          ))}
+    <div className="mt-6 grid grid-cols-3 divide-x divide-line border-t border-line pt-5">
+      {stats.map((stat) => (
+        <div key={stat.label} title={stat.title} className="px-3 first:pl-0 last:pr-0">
+          <p className="font-display text-2xl font-semibold tabular-nums">{statsPending ? "—" : stat.value}</p>
+          <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-ink-soft">{stat.label}</p>
         </div>
-      </div>
-    </section>
+      ))}
+    </div>
   );
 }
 

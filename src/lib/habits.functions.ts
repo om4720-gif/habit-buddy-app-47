@@ -271,3 +271,44 @@ export const getWeeklyProgress = createServerFn({ method: "POST" })
 
     return days;
   });
+
+/** Active habits plus their completions between two dates (inclusive), for the tracker. */
+export const getHabitHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => z.object({ start: dateSchema, end: dateSchema }).parse(data))
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
+
+    const { data: habits, error: habitsError } = await supabase
+      .from("habits")
+      .select("id, name, created_at")
+      .eq("archived", false)
+      .order("created_at", { ascending: true });
+    if (habitsError) throw new Error(habitsError.message);
+
+    const ids = habits?.map((h) => h.id) ?? [];
+    const completions: { habit_id: string; completed_date: string }[] = [];
+
+    if (ids.length > 0) {
+      // A year of several habits is more than one 1000-row page, so page through it.
+      for (let from = 0; ; from += 1000) {
+        const { data: page, error } = await supabase
+          .from("habit_completions")
+          .select("habit_id, completed_date")
+          .in("habit_id", ids)
+          .gte("completed_date", data.start)
+          .lte("completed_date", data.end)
+          .order("completed_date", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, from + 999);
+        if (error) throw new Error(error.message);
+        completions.push(...(page ?? []));
+        if (!page || page.length < 1000) break;
+      }
+    }
+
+    return {
+      habits: (habits ?? []).map((h) => ({ id: h.id, name: h.name, created_at: h.created_at ?? "" })),
+      completions,
+    };
+  });
