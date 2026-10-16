@@ -106,6 +106,8 @@ function UniPage() {
     kind: "assignment" as "assignment" | "quiz",
     dueDate: format(new Date(), "yyyy-MM-dd"),
   });
+  const [editingLectureId, setEditingLectureId] = useState<string | null>(null);
+  const [editLectureTitle, setEditLectureTitle] = useState("");
 
   const reminderItems = deadlines.map((d) => ({
     id: d.id,
@@ -273,6 +275,26 @@ function UniPage() {
       queryClient.invalidateQueries({ queryKey: ["points"] });
     } catch (err) {
       toast.error("Could not update lecture");
+    }
+  }
+
+  function openEditLecture(lecture: (typeof lectures)[number]) {
+    setEditingLectureId(lecture.id);
+    setEditLectureTitle(lecture.title);
+  }
+
+  async function handleEditLecture(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingLectureId) return;
+    try {
+      await updateLectureFn({
+        data: { lectureId: editingLectureId, title: editLectureTitle.trim() },
+      });
+      setEditingLectureId(null);
+      queryClient.invalidateQueries({ queryKey: ["lectures"] });
+      toast.success("Lecture renamed");
+    } catch {
+      toast.error("Could not rename lecture");
     }
   }
 
@@ -1014,14 +1036,26 @@ function UniPage() {
                                   )}
                                 </div>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeLecture(lecture.id)}
-                                className="text-ink-muted hover:text-rust"
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEditLecture(lecture)}
+                                  className="text-ink-muted hover:text-rust"
+                                  aria-label="Rename lecture"
+                                >
+                                  <Pencil className="size-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeLecture(lecture.id)}
+                                  className="text-ink-muted hover:text-rust"
+                                  aria-label="Remove lecture"
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </div>
                             </div>
                           ))
                         )}
@@ -1035,6 +1069,43 @@ function UniPage() {
           })}
         </div>
       )}
+
+      <Dialog
+        open={editingLectureId !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingLectureId(null);
+        }}
+      >
+        <DialogContent className="rounded-2xl border-line bg-card">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl text-ink">
+              Rename lecture
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditLecture} className="mt-2 space-y-4">
+            <div>
+              <Label htmlFor="editLectureTitle" className="text-ink-soft">
+                Title
+              </Label>
+              <Input
+                id="editLectureTitle"
+                value={editLectureTitle}
+                onChange={(e) => setEditLectureTitle(e.target.value)}
+                required
+                maxLength={300}
+                className="mt-1 rounded-xl border-line bg-background text-ink"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={!editLectureTitle.trim()}
+              className="w-full rounded-full bg-rust text-cream hover:bg-rust/90"
+            >
+              Save name
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={lectureDialogOpen} onOpenChange={setLectureDialogOpen}>
         <DialogContent className="rounded-2xl border-line bg-card">
