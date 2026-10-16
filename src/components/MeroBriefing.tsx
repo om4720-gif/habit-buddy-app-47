@@ -3,6 +3,7 @@ import { Check, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { BuddyFace } from "@/components/Buddy";
 import { Button } from "@/components/ui/button";
 import { updateDeadline } from "@/lib/deadlines.functions";
 import { useUserSettings } from "@/lib/useUserSettings";
@@ -41,9 +42,7 @@ export function MeroBriefing({ date }: { date: string }) {
     <section className="mt-8 rounded-3xl border border-border bg-card p-6 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-full bg-primary font-display text-lg font-semibold text-primary-foreground">
-            {agent.charAt(0).toUpperCase()}
-          </div>
+          <BuddyFace className="size-12" mood="happy" joy={false} />
           <div>
             <h2 className="font-semibold">{agent}</h2>
             <p className="text-xs text-ink-soft">Your daily briefing</p>

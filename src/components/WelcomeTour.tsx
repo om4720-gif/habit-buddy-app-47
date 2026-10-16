@@ -137,7 +137,7 @@ export function WelcomeTour() {
       title: "Meet your agent",
       body: (
         <p>
-          The round button in the corner is your {em("study agent")}. Type or talk to it, like "I finished lecture 2",
+          The little bird in the corner (that's me!) is your {em("study agent")}. Type or talk to it, like "I finished lecture 2",
           and it marks things done and plans your day. Right now it's called {em(agentName)}. You can rename it in{" "}
           {em("Settings")}.
         </p>

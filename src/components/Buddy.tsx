@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
-export type BuddyMood = "wave" | "ready" | "happy" | "party";
+export type BuddyMood = "wave" | "ready" | "happy" | "party" | "think";
 
 const GOLD = "#F2B84B";
 const DARK_RUST = "#B8431F";
@@ -21,6 +21,34 @@ const TAP_LINES = [
   "Finish one thing, then breathe.",
 ];
 
+/** Pupils follow the pointer; when `lookUp` is set they stare up-left instead (thinking). */
+export function usePupilFollow(lookUp = false) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const pupilsRef = useRef<SVGGElement | null>(null);
+
+  useEffect(() => {
+    if (lookUp) {
+      if (pupilsRef.current) pupilsRef.current.style.transform = "translate(-1.5px, -3px)";
+      return;
+    }
+    const move = (e: PointerEvent) => {
+      const svg = svgRef.current;
+      const pupils = pupilsRef.current;
+      if (!svg || !pupils) return;
+      const r = svg.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width / 2);
+      const dy = e.clientY - (r.top + r.height / 2);
+      const d = Math.hypot(dx, dy) || 1;
+      const k = (Math.min(d, 140) / 140) * 3;
+      pupils.style.transform = `translate(${(dx / d) * k}px, ${(dy / d) * k}px)`;
+    };
+    window.addEventListener("pointermove", move);
+    return () => window.removeEventListener("pointermove", move);
+  }, [lookUp]);
+
+  return { svgRef, pupilsRef };
+}
+
 /** The drawing only (no state), so it can be rendered on its own. */
 export function BuddyFace({
   mood,
@@ -28,10 +56,12 @@ export function BuddyFace({
   confetti = false,
   svgRef,
   pupilsRef,
+  className = "size-20",
 }: {
   mood: BuddyMood;
   joy: boolean;
   confetti?: boolean;
+  className?: string;
   svgRef?: RefObject<SVGSVGElement | null>;
   pupilsRef?: RefObject<SVGGElement | null>;
 }) {
@@ -40,7 +70,7 @@ export function BuddyFace({
   const confettiColors = ["var(--rust)", GOLD, "var(--ink-soft)", CHEEK];
 
   return (
-    <svg ref={svgRef} viewBox="0 0 100 100" overflow="visible" className="size-20" aria-hidden="true">
+    <svg ref={svgRef} viewBox="0 0 100 100" overflow="visible" className={className} aria-hidden="true">
       <ellipse cx="50" cy="96" rx="24" ry="4" style={{ fill: "var(--ink)" }} opacity="0.12" />
 
       <g className={bodyClass}>
@@ -106,6 +136,14 @@ export function BuddyFace({
         )}
       </g>
 
+      {mood === "think" && !joy && (
+        <g style={{ fill: "var(--ink-soft)" }}>
+          {[34, 50, 66].map((x, i) => (
+            <circle key={x} cx={x} cy={8 - (i === 1 ? 4 : 0)} r="3.2" className="buddy-think-dot" style={{ animationDelay: `${i * 0.18}s` }} />
+          ))}
+        </g>
+      )}
+
       {party && !confetti && (
         <g fill={GOLD} fontSize="11">
           <text x="6" y="26" className="buddy-twinkle">✦</text>
@@ -134,8 +172,7 @@ export function BuddyFace({
 export function Buddy({ mood, completed, total }: { mood: BuddyMood; completed: number; total: number }) {
   const [hop, setHop] = useState(false);
   const [bubble, setBubble] = useState<string | null>(null);
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const pupilsRef = useRef<SVGGElement | null>(null);
+  const { svgRef, pupilsRef } = usePupilFollow();
   const prevCompleted = useRef<number | null>(null);
   const timers = useRef<number[]>([]);
   const lastLine = useRef("");
@@ -163,23 +200,6 @@ export function Buddy({ mood, completed, total }: { mood: BuddyMood; completed: 
   }, [completed, total]);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
-
-  // Pupils follow the pointer.
-  useEffect(() => {
-    const move = (e: PointerEvent) => {
-      const svg = svgRef.current;
-      const pupils = pupilsRef.current;
-      if (!svg || !pupils) return;
-      const r = svg.getBoundingClientRect();
-      const dx = e.clientX - (r.left + r.width / 2);
-      const dy = e.clientY - (r.top + r.height / 2);
-      const d = Math.hypot(dx, dy) || 1;
-      const k = (Math.min(d, 140) / 140) * 3;
-      pupils.style.transform = `translate(${(dx / d) * k}px, ${(dy / d) * k}px)`;
-    };
-    window.addEventListener("pointermove", move);
-    return () => window.removeEventListener("pointermove", move);
-  }, []);
 
   return (
     <div className="relative">

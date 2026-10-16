@@ -4,6 +4,7 @@ import { Loader2, Mic, Send, Square, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { BuddyFace } from "@/components/Buddy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { askMero } from "@/lib/mero-chat.functions";
@@ -23,7 +24,13 @@ function speak(text: string) {
   window.speechSynthesis.speak(u);
 }
 
-export function MeroChat() {
+export function MeroChat({
+  onThinking,
+  onReply,
+}: {
+  onThinking?: (thinking: boolean) => void;
+  onReply?: (changed: boolean) => void;
+} = {}) {
   const qc = useQueryClient();
   const agent = useUserSettings().settings.agent_name;
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -44,18 +51,21 @@ export function MeroChat() {
       setMsgs(next);
       setText("");
       setThinking(true);
+      onThinking?.(true);
       try {
         const res = await askMero({ data: { today: format(new Date(), "yyyy-MM-dd"), messages: next } });
         setMsgs((m) => [...m, { role: "assistant", content: res.reply }]);
         if (voiceOn) speak(res.reply);
         if (res.changed) qc.invalidateQueries();
+        onReply?.(res.changed);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Mero couldn't answer.");
       } finally {
         setThinking(false);
+        onThinking?.(false);
       }
     },
-    [msgs, thinking, voiceOn, qc],
+    [msgs, thinking, voiceOn, qc, onThinking, onReply],
   );
 
   const { recording, busy, toggle } = useVoiceInput(send);
@@ -64,7 +74,10 @@ export function MeroChat() {
   return (
     <div className="mt-4 border-t border-border pt-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">Talk to {agent}{agent === "Mero" ? " · تكلم مع ميرو" : ""}</p>
+        <p className="flex items-center gap-2 text-sm font-medium">
+          <BuddyFace className="size-8" mood="happy" joy={false} />
+          Talk to {agent}{agent === "Mero" ? " · تكلم مع ميرو" : ""}
+        </p>
         <button
           type="button"
           aria-label="Switch speaking language"

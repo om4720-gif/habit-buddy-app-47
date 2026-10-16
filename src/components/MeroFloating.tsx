@@ -1,7 +1,8 @@
 import { format } from "date-fns";
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { BuddyFace, usePupilFollow } from "@/components/Buddy";
 import { MeroBriefing } from "@/components/MeroBriefing";
 import { MeroChat } from "@/components/MeroChat";
 import { useUserSettings } from "@/lib/useUserSettings";
@@ -10,6 +11,17 @@ export function MeroFloating() {
   const [open, setOpen] = useState(false);
   const agent = useUserSettings().settings.agent_name;
   const [pos, setPos] = useState(0);
+  const [thinking, setThinking] = useState(false);
+  const [hop, setHop] = useState(false);
+  const hopTimer = useRef<number | undefined>(undefined);
+  const { svgRef, pupilsRef } = usePupilFollow(thinking);
+
+  const celebrate = () => {
+    window.clearTimeout(hopTimer.current);
+    setHop(true);
+    hopTimer.current = window.setTimeout(() => setHop(false), 1000);
+  };
+  useEffect(() => () => window.clearTimeout(hopTimer.current), []);
 
   // Mero drifts between spots along the screen edge every few seconds
   useEffect(() => {
@@ -34,23 +46,30 @@ export function MeroFloating() {
             </button>
             <div className="rounded-3xl border border-border bg-card p-6 shadow-xl [&>section]:mt-0 [&>section]:border-0 [&>section]:p-0 [&>section]:shadow-none">
               <MeroBriefing date={format(new Date(), "yyyy-MM-dd")} />
-              <MeroChat />
+              <MeroChat onThinking={setThinking} onReply={(changed) => changed && celebrate()} />
             </div>
           </div>
         </div>
       )}
       <button
         aria-label={`Open ${agent}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setOpen((o) => !o);
+          celebrate();
+        }}
         className={`fixed z-50 transition-all duration-[2000ms] ease-in-out ${open ? "bottom-6 right-6" : spots[pos]}`}
       >
-        <span className="relative block animate-mero-float">
-          <span className="absolute inset-x-2 -bottom-3 h-2 rounded-full bg-ink/15 blur-sm" />
-          <span className="grid h-14 w-14 place-items-center rounded-full bg-primary font-display text-2xl font-semibold text-primary-foreground shadow-lg ring-4 ring-primary/20">
-            {agent.charAt(0).toUpperCase()}
-          </span>
+        <span className="relative block">
+          <BuddyFace
+            className="size-16 drop-shadow-md"
+            mood={thinking ? "think" : "happy"}
+            joy={hop}
+            confetti={hop}
+            svgRef={svgRef}
+            pupilsRef={pupilsRef}
+          />
           {!open && (
-            <span className="absolute -top-8 right-0 whitespace-nowrap rounded-full bg-card px-2.5 py-1 text-xs font-medium shadow border border-border">
+            <span className="absolute -top-7 right-0 whitespace-nowrap rounded-full bg-card px-2.5 py-1 text-xs font-medium shadow border border-border">
               Hi, I'm {agent} 👋
             </span>
           )}
