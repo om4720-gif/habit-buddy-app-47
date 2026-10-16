@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { OPEN_TOUR_EVENT } from "@/components/WelcomeTour";
 import { useUserSettings } from "@/lib/useUserSettings";
 
 export function SettingsDialog() {
@@ -58,6 +59,16 @@ export function SettingsDialog() {
               <Input className="mt-1" value={page} onChange={(e) => setPage(e.target.value)} />
             </label>
             <Button type="submit" className="w-full">Save</Button>
+            <button
+              type="button"
+              className="block w-full text-center text-xs text-ink-soft underline-offset-2 hover:text-ink hover:underline"
+              onClick={() => {
+                setOpen(false);
+                window.dispatchEvent(new Event(OPEN_TOUR_EVENT));
+              }}
+            >
+              Replay the welcome tour
+            </button>
           </form>
         </DialogContent>
       </Dialog>

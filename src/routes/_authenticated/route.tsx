@@ -3,6 +3,7 @@ import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouteContext }
 import { supabase } from "@/integrations/supabase/client";
 import { MeroFloating } from "@/components/MeroFloating";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { WelcomeTour } from "@/components/WelcomeTour";
 import { useUserSettings } from "@/lib/useUserSettings";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -60,6 +61,7 @@ function AppLayout() {
       </nav>
       <Outlet />
       <MeroFloating />
+      <WelcomeTour />
     </div>
   );
 }
