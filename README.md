@@ -37,6 +37,11 @@ Set these as secrets for the project:
 | `FALLBACK_AI_API_KEY` | yes | — |
 | `FALLBACK_AI_BASE_URL` | no | `https://generativelanguage.googleapis.com/v1beta/openai/` |
 | `FALLBACK_AI_MODEL` | no | `gemini-3.5-flash` |
+| `FALLBACK_AI_TRANSCRIBE_MODEL` | no | same as `FALLBACK_AI_MODEL` |
+
+With the key set, the mic button also uses this provider for speech-to-text, which is much better with
+Arabic and mixed Arabic/English than the browser's built-in recognition. Without it, the mic falls back
+to the browser's speech recognition (Chrome, Edge, Safari).
 
 Note: on Google's free tier, prompts may be used to improve their models, and Mero's prompts
 include your course, deadline and habit names.

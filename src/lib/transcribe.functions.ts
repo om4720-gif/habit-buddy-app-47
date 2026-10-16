@@ -2,54 +2,62 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getFallbackAI } from "@/lib/ai-fallback.server";
+
+const PROMPT =
+  "Transcribe this audio exactly as spoken. The speaker may use Egyptian Arabic, English, or a mix of both. " +
+  "Write Arabic words in Arabic script and English words (course names, 'lecture', 'tutorial', 'assignment') in English. " +
+  "Output only the transcript, with no commentary and no quotation marks. If there is no speech, output nothing.";
+
+/** Tells the client whether cloud transcription (Gemini, via the free key) is available. */
+export const getVoiceEngine = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => ({ cloud: getFallbackAI() !== null }));
 
 export const transcribeAudio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data) =>
     z
       .object({
-        // ~28M base64 chars ≈ 20 MB of audio; reject bigger payloads before decoding.
+        // ~28M base64 chars is about 20 MB of audio; reject bigger payloads early.
         audioBase64: z.string().min(100).max(28_000_000),
       })
       .parse(data)
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env["LOVABLE_API_KEY"];
-    if (!apiKey) throw new Error("Voice input is not configured.");
+    const fb = getFallbackAI();
+    if (!fb) throw new Error("Cloud voice isn't set up. Add the FALLBACK_AI_API_KEY secret.");
 
-    const binary = Uint8Array.from(atob(data.audioBase64), (c) =>
-      c.charCodeAt(0)
-    );
-    if (binary.byteLength > 20 * 1024 * 1024) {
-      throw new Error("Recording is too long.");
-    }
-
-    const form = new FormData();
-    form.append("model", "google/gemini-3.5-transcribe");
-    form.append(
-      "file",
-      new Blob([binary], { type: "audio/wav" }),
-      "recording.wav"
-    );
-
-    const res = await fetch(
-      "https://ai.gateway.lovable.dev/v1/audio/transcriptions",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}` },
-        body: form,
-      }
-    );
+    const res = await fetch(`${fb.baseURL.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${fb.apiKey}` },
+      body: JSON.stringify({
+        model: process.env["FALLBACK_AI_TRANSCRIBE_MODEL"] ?? fb.model,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: PROMPT },
+              { type: "input_audio", input_audio: { data: data.audioBase64, format: "wav" } },
+            ],
+          },
+        ],
+      }),
+    });
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.error(`Transcription failed [${res.status}]: ${body}`);
-      if (res.status === 429) throw new Error("Too many requests, try again shortly.");
-      if (res.status === 402 || res.status === 403)
-        throw new Error("Voice input is unavailable right now.");
+      console.error(`Transcription failed [${res.status}]: ${body.slice(0, 500)}`);
+      if (res.status === 429) throw new Error("Too many voice requests. Try again in a minute.");
+      if (res.status === 400 || res.status === 404)
+        throw new Error("The voice model rejected the request. Check FALLBACK_AI_MODEL in your secrets.");
+      if (res.status === 401 || res.status === 403)
+        throw new Error("The voice key was refused. Check FALLBACK_AI_API_KEY in your secrets.");
       throw new Error("Could not understand that recording.");
     }
 
-    const json = (await res.json()) as { text?: string };
-    return { text: (json.text ?? "").trim() };
+    const json = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
+    const content = json.choices?.[0]?.message?.content;
+    const text = typeof content === "string" ? content : "";
+    return { text: text.trim().replace(/^["“”']+|["“”']+$/g, "") };
   });
