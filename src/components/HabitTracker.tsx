@@ -1,11 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  addMonths,
+  addWeeks,
+  addYears,
   eachDayOfInterval,
   eachMonthOfInterval,
   endOfMonth,
   endOfWeek,
   endOfYear,
   format,
+  getDay,
   startOfMonth,
   startOfWeek,
   startOfYear,
@@ -21,21 +25,36 @@ type DayState = "done" | "missed" | "future" | "before";
 const RANGES: Range[] = ["week", "month", "year"];
 const WEEK_STARTS_ON = 1; // Monday. Use 6 for Saturday, 0 for Sunday.
 const fmt = (d: Date) => format(d, "yyyy-MM-dd");
+const leadBlanks = (d: Date) => (getDay(d) - WEEK_STARTS_ON + 7) % 7;
+
+export function shiftBy(now: Date, range: Range, offset: number) {
+  if (range === "week") return addWeeks(now, offset);
+  if (range === "month") return addMonths(now, offset);
+  return addYears(now, offset);
+}
 
 function boundsFor(range: Range, now: Date) {
   if (range === "week")
-    return { start: startOfWeek(now, { weekStartsOn: WEEK_STARTS_ON }), end: endOfWeek(now, { weekStartsOn: WEEK_STARTS_ON }) };
+    return {
+      start: startOfWeek(now, { weekStartsOn: WEEK_STARTS_ON }),
+      end: endOfWeek(now, { weekStartsOn: WEEK_STARTS_ON }),
+    };
   if (range === "month") return { start: startOfMonth(now), end: endOfMonth(now) };
   return { start: startOfYear(now), end: endOfYear(now) };
 }
 
-const DOT_MAX = { week: "max-w-[22px]", month: "max-w-[14px]", year: "max-w-[28px]" } as const;
-const GAP = { week: "gap-2", month: "gap-[3px]", year: "gap-1.5" } as const;
+export type TrackerData = {
+  habits: { id: string; name: string; created_at: string }[];
+  completions: { habit_id: string; completed_date: string }[];
+};
 
 export function HabitTracker({ date, footer }: { date: string; footer?: ReactNode }) {
-  const [range, setRange] = useState<Range>("week");
-  const now = new Date(`${date}T00:00:00`);
-  const { start, end } = boundsFor(range, now);
+  const [range, setRange] = useState<Range>("month");
+  const [offset, setOffset] = useState(0);
+  const [focusId, setFocusId] = useState<string | null>(null);
+
+  const today = new Date(`${date}T00:00:00`);
+  const { start, end } = boundsFor(range, shiftBy(today, range, offset));
   const startStr = fmt(start);
   const endStr = fmt(end);
 
@@ -44,19 +63,39 @@ export function HabitTracker({ date, footer }: { date: string; footer?: ReactNod
     queryFn: () => getHabitHistory({ data: { start: startStr, end: endStr } }),
   });
 
-  return <TrackerView date={date} range={range} onRange={setRange} data={data} isPending={isPending} footer={footer} />;
+  return (
+    <TrackerView
+      date={date}
+      range={range}
+      onRange={(r) => {
+        setRange(r);
+        setOffset(0);
+      }}
+      offset={offset}
+      onOffset={setOffset}
+      focusId={focusId}
+      onFocus={setFocusId}
+      onOpenMonth={(m) => {
+        setRange("month");
+        setOffset((m.getFullYear() - today.getFullYear()) * 12 + (m.getMonth() - today.getMonth()));
+      }}
+      data={data}
+      isPending={isPending}
+      footer={footer}
+    />
+  );
 }
-
-export type TrackerData = {
-  habits: { id: string; name: string; created_at: string }[];
-  completions: { habit_id: string; completed_date: string }[];
-};
 
 /** Pure view: everything is derived from props, so it is easy to test. */
 export function TrackerView({
   date,
   range,
   onRange,
+  offset,
+  onOffset,
+  focusId,
+  onFocus,
+  onOpenMonth,
   data,
   isPending,
   footer,
@@ -64,15 +103,22 @@ export function TrackerView({
   date: string;
   range: Range;
   onRange: (r: Range) => void;
+  offset: number;
+  onOffset: (n: number) => void;
+  focusId: string | null;
+  onFocus: (id: string | null) => void;
+  onOpenMonth: (month: Date) => void;
   data: TrackerData | undefined;
   isPending: boolean;
   footer?: ReactNode;
 }) {
-  const now = new Date(`${date}T00:00:00`);
-  const { start, end } = boundsFor(range, now);
+  const today = new Date(`${date}T00:00:00`);
+  const base = shiftBy(today, range, offset);
+  const { start, end } = boundsFor(range, base);
   const startStr = fmt(start);
 
   const days = eachDayOfInterval({ start, end });
+  const dayIndex = new Map(days.map((d, i) => [fmt(d), i]));
   const months = range === "year" ? eachMonthOfInterval({ start, end }) : [];
 
   const doneByHabit = new Map<string, Set<string>>();
@@ -95,36 +141,50 @@ export function TrackerView({
     });
     const doneCount = states.filter((s) => s === "done").length;
     const possible = states.filter((s) => s === "done" || s === "missed").length;
-    const monthly = months.map((_, m) => {
-      let d = 0;
-      let p = 0;
-      let future = true;
-      days.forEach((day, i) => {
-        if (day.getMonth() !== m) return;
-        const st = states[i];
-        if (st !== "future") future = false;
-        if (st === "done") d++;
-        if (st === "done" || st === "missed") p++;
-      });
-      return { done: d, possible: p, future };
-    });
     return {
       habit,
       color: habitColor(index),
       states,
-      monthly,
       doneCount,
       possible,
       rate: possible > 0 ? doneCount / possible : 0,
     };
   });
 
-  const ranked = rows.filter((r) => r.possible >= 3).sort((a, b) => b.rate - a.rate);
-  const top = ranked[0];
-  const low = ranked.length >= 2 ? ranked[ranked.length - 1] : undefined;
+  const focused = focusId ? rows.find((r) => r.habit.id === focusId) : undefined;
+  const visible = focused ? [focused] : rows;
+  const cols = Math.max(1, Math.min(visible.length, visible.length <= 6 ? 3 : 4));
+  const dotSize =
+    range === "week"
+      ? focused ? "size-5" : "size-3 sm:size-3.5"
+      : focused ? "size-3.5" : "size-1.5 sm:size-2";
 
-  const columns = range === "year" ? 12 : days.length;
-  const gridStyle = { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` };
+  const stateOf = (r: (typeof rows)[number], s: string): DayState => r.states[dayIndex.get(s) ?? -1] ?? "before";
+
+  const dotsFor = (d: Date) => (
+    <div className="mt-1 grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${cols}, auto)` }}>
+      {visible.map((r) => {
+        const st = stateOf(r, fmt(d));
+        return (
+          <span
+            key={r.habit.id}
+            title={`${r.habit.name}, ${format(d, "EEE d MMM")}: ${
+              st === "done" ? "done" : st === "missed" ? "missed" : st === "future" ? "upcoming" : "not started"
+            }`}
+            className={`block rounded-full ${dotSize}`}
+            style={
+              st === "done"
+                ? { backgroundColor: r.color }
+                : st === "missed"
+                  ? { backgroundColor: `${r.color}22` }
+                  : undefined
+            }
+          />
+        );
+      })}
+    </div>
+  );
+
   const period =
     range === "week"
       ? `${format(start, "MMM d")} – ${format(end, "MMM d")}`
@@ -132,20 +192,18 @@ export function TrackerView({
         ? format(start, "MMMM yyyy")
         : format(start, "yyyy");
 
-  const headerLabels: { text: string; today?: boolean }[] =
-    range === "year"
-      ? months.map((m) => ({ text: format(m, "MMMMM") }))
-      : range === "week"
-        ? days.map((d) => ({ text: format(d, "EEEEE"), today: fmt(d) === date }))
-        : days.map((d) => {
-            const n = d.getDate();
-            return { text: [1, 5, 10, 15, 20, 25, 30].includes(n) ? String(n) : "", today: fmt(d) === date };
-          });
+  const weekdayLetters = eachDayOfInterval({
+    start: startOfWeek(today, { weekStartsOn: WEEK_STARTS_ON }),
+    end: endOfWeek(today, { weekStartsOn: WEEK_STARTS_ON }),
+  }).map((d) => format(d, "EEEEE"));
+
+  const arrow =
+    "grid size-8 place-items-center rounded-full text-ink-soft transition hover:bg-paper hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent";
 
   return (
     <section className="mt-10">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">Tracker</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">Calendar</h2>
         <div className="inline-flex rounded-full bg-paper p-1 ring-1 ring-black/5">
           {RANGES.map((r) => (
             <button
@@ -163,93 +221,172 @@ export function TrackerView({
       </div>
 
       <div className="mt-4 rounded-3xl bg-cream p-5 ring-1 ring-black/5 sm:p-6">
-        <p className="text-xs tabular-nums text-ink-soft">{period}</p>
+        <div className="flex items-center justify-between">
+          <button className={arrow} aria-label={`Previous ${range}`} onClick={() => onOffset(offset - 1)}>
+            ‹
+          </button>
+          <p className="font-display text-lg font-semibold tabular-nums text-ink">{period}</p>
+          <button className={arrow} aria-label={`Next ${range}`} disabled={offset >= 0} onClick={() => onOffset(offset + 1)}>
+            ›
+          </button>
+        </div>
 
         {isPending ? (
-          <div className="mt-4 h-32 animate-pulse rounded-xl bg-paper" />
+          <div className="mt-4 h-56 animate-pulse rounded-xl bg-paper" />
         ) : rows.length === 0 ? (
-          <p className="mt-4 text-sm text-ink-soft">Add a habit and its dots will show up here.</p>
+          <p className="mt-4 text-sm text-ink-soft">Add a habit and its dots will show up on the calendar.</p>
         ) : (
           <>
-            <div className={`mt-4 grid ${GAP[range]}`} style={gridStyle} aria-hidden="true">
-              {headerLabels.map((l, i) => (
-                <span
-                  key={i}
-                  className={`overflow-visible whitespace-nowrap text-center text-[10px] font-semibold ${
-                    l.today ? "text-rust" : "text-ink-soft"
-                  }`}
-                >
-                  {l.text}
-                </span>
-              ))}
-            </div>
+            {range === "week" && (
+              <div className="mt-4 grid grid-cols-7 gap-1.5 sm:gap-2">
+                {days.map((d) => {
+                  const isToday = fmt(d) === date;
+                  const future = fmt(d) > date;
+                  return (
+                    <div
+                      key={fmt(d)}
+                      data-day={fmt(d)}
+                      className={`flex flex-col items-center rounded-2xl bg-paper px-1 py-3 ${
+                        isToday ? "ring-2 ring-rust/50" : ""
+                      } ${future ? "opacity-60" : ""}`}
+                    >
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">{format(d, "EEE")}</span>
+                      <span className={`font-display text-lg font-semibold tabular-nums ${isToday ? "text-rust" : "text-ink"}`}>
+                        {d.getDate()}
+                      </span>
+                      {dotsFor(d)}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-            <ul className="mt-2 space-y-5">
-              {rows.map((r) => (
-                <li key={r.habit.id}>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-ink">
-                      <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: r.color }} />
-                      <span className="truncate">{r.habit.name}</span>
+            {range === "month" && (
+              <div className="mt-4">
+                <div className="grid grid-cols-7 gap-1" aria-hidden="true">
+                  {weekdayLetters.map((l, i) => (
+                    <span key={i} className="text-center text-[10px] font-semibold uppercase text-ink-soft">
+                      {l}
                     </span>
-                    <span className="shrink-0 text-xs tabular-nums text-ink-soft">
-                      {r.doneCount}/{r.possible} · {Math.round(r.rate * 100)}%
-                    </span>
-                  </div>
+                  ))}
+                </div>
+                <div className="mt-1 grid grid-cols-7 gap-1">
+                  {Array.from({ length: leadBlanks(start) }).map((_, i) => (
+                    <span key={`b${i}`} />
+                  ))}
+                  {days.map((d) => {
+                    const isToday = fmt(d) === date;
+                    const future = fmt(d) > date;
+                    return (
+                      <div
+                        key={fmt(d)}
+                        data-day={fmt(d)}
+                        className={`flex min-h-[44px] flex-col items-center rounded-xl px-0.5 py-1 sm:min-h-[56px] ${
+                          isToday ? "bg-rust/10 ring-1 ring-rust/40" : ""
+                        }`}
+                      >
+                        <span
+                          className={`text-[11px] font-semibold tabular-nums ${
+                            isToday ? "text-rust" : future ? "text-ink-soft/40" : "text-ink-soft"
+                          }`}
+                        >
+                          {d.getDate()}
+                        </span>
+                        {dotsFor(d)}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-                  <div className={`mt-2 grid ${GAP[range]}`} style={gridStyle}>
-                    {range === "year"
-                      ? r.monthly.map((m, i) => {
-                          const rate = m.possible > 0 ? m.done / m.possible : 0;
-                          const name = format(months[i]!, "MMMM");
+            {range === "year" && (
+              <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {months.map((m) => {
+                  const monthDays = days.filter((d) => d.getMonth() === m.getMonth());
+                  const upcoming = startOfMonth(m) > today;
+                  return (
+                    <button
+                      key={m.getMonth()}
+                      disabled={upcoming}
+                      onClick={() => onOpenMonth(m)}
+                      aria-label={`Open ${format(m, "MMMM")}`}
+                      className="rounded-2xl p-2 text-left transition enabled:hover:bg-paper disabled:opacity-50"
+                    >
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
+                        {format(m, "MMM")}
+                      </p>
+                      <div className="grid grid-cols-7 gap-[2px]">
+                        {Array.from({ length: leadBlanks(startOfMonth(m)) }).map((_, i) => (
+                          <span key={`b${i}`} />
+                        ))}
+                        {monthDays.map((d) => {
+                          const s = fmt(d);
+                          let style: React.CSSProperties | undefined;
+                          if (focused) {
+                            const st = stateOf(focused, s);
+                            style =
+                              st === "done"
+                                ? { backgroundColor: focused.color }
+                                : st === "missed"
+                                  ? { backgroundColor: `${focused.color}22` }
+                                  : undefined;
+                          } else {
+                            const sts = rows.map((r) => stateOf(r, s)).filter((x) => x === "done" || x === "missed");
+                            if (sts.length > 0) {
+                              const frac = sts.filter((x) => x === "done").length / sts.length;
+                              style = { backgroundColor: "var(--rust)", opacity: 0.15 + 0.85 * frac };
+                            }
+                          }
                           return (
                             <span
-                              key={i}
-                              title={m.future ? `${name}: upcoming` : `${name}: ${m.done}/${m.possible} (${Math.round(rate * 100)}%)`}
-                              className={`mx-auto block aspect-square w-full rounded-lg ${DOT_MAX.year} ${
-                                m.future ? "bg-sand/60" : ""
-                              }`}
-                              style={
-                                m.future || m.possible === 0
-                                  ? undefined
-                                  : { backgroundColor: r.color, opacity: 0.12 + 0.88 * rate }
-                              }
-                            />
-                          );
-                        })
-                      : r.states.map((state, i) => {
-                          const d = days[i]!;
-                          const isToday = fmt(d) === date;
-                          return (
-                            <span
-                              key={i}
-                              title={`${r.habit.name}, ${format(d, "EEE d MMM")}: ${
-                                state === "done" ? "done" : state === "missed" ? "missed" : state === "future" ? "upcoming" : "not started"
-                              }`}
-                              className={`mx-auto block aspect-square w-full rounded-full ${DOT_MAX[range]} ${
-                                state === "future" ? "bg-sand/60" : ""
-                              } ${isToday ? "ring-2 ring-ink/40 ring-offset-1 ring-offset-cream" : ""}`}
-                              style={
-                                state === "done"
-                                  ? { backgroundColor: r.color }
-                                  : state === "missed"
-                                    ? { backgroundColor: `${r.color}26` }
-                                    : undefined
-                              }
+                              key={s}
+                              data-day={s}
+                              className={`aspect-square rounded-[3px] ${style ? "" : "bg-sand/40"}`}
+                              style={style}
                             />
                           );
                         })}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-            {top && low && low.rate < top.rate ? (
-              <p className="mt-5 text-xs leading-relaxed text-ink-soft">
-                Most consistent: <span className="font-semibold text-ink">{top.habit.name}</span> {Math.round(top.rate * 100)}%
-                · Needs some love: <span className="font-semibold text-ink">{low.habit.name}</span> {Math.round(low.rate * 100)}%
-              </p>
-            ) : null}
+            <ul className="mt-5 space-y-1 border-t border-line pt-4">
+              {rows.map((r) => {
+                const active = focusId === r.habit.id;
+                return (
+                  <li key={r.habit.id}>
+                    <button
+                      aria-pressed={active}
+                      onClick={() => onFocus(active ? null : r.habit.id)}
+                      className={`w-full rounded-xl px-2 py-1.5 text-left transition hover:bg-paper ${
+                        active ? "bg-paper ring-1 ring-black/5" : focusId ? "opacity-50" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-ink">
+                          <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: r.color }} />
+                          <span className="truncate">{r.habit.name}</span>
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-ink-soft">
+                          {r.doneCount}/{r.possible} · {Math.round(r.rate * 100)}%
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-sand/60">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${Math.round(r.rate * 100)}%`, backgroundColor: r.color }}
+                        />
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-2 text-[11px] text-ink-soft">Tap a habit to see only its dots.</p>
           </>
         )}
 
