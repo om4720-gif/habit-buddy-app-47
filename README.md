@@ -45,3 +45,16 @@ to the browser's speech recognition (Chrome, Edge, Safari).
 
 Note: on Google's free tier, prompts may be used to improve their models, and Mero's prompts
 include your course, deadline and habit names.
+
+## Make it yours
+
+Tap the ✦ points pill, then **Make it yours**: dress Buddy (hats, glasses, scarf...), pick his fur color,
+and change the app's accent color. Outfit items and fur colors cost points; app colors are free.
+Purchases are stored as redemptions titled `Buddy item: <id>` in `reward_redemptions`, so they follow the
+account. What Buddy is currently wearing and the chosen theme are kept in the browser (`localStorage`).
+
+## Your data (Settings)
+
+- **Calendar (.ics):** open deadlines as all-day events with a reminder the day before.
+- **Full backup (JSON):** every table in one file (course photo files themselves are not included).
+- **CSV:** habit history, courses and lectures, deadlines (UTF-8 with BOM so Excel shows Arabic correctly).
