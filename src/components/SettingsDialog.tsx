@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { OPEN_TOUR_EVENT } from "@/components/WelcomeTour";
+import {
+  exportBackup,
+  exportDeadlinesCsv,
+  exportDeadlinesIcs,
+  exportHabitCsv,
+  exportStudyCsv,
+} from "@/lib/export";
 import { useUserSettings } from "@/lib/useUserSettings";
 
 export function SettingsDialog() {
@@ -12,6 +19,18 @@ export function SettingsDialog() {
   const [open, setOpen] = useState(false);
   const [agent, setAgent] = useState(settings.agent_name);
   const [page, setPage] = useState(settings.habit_page_name);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const run = async (id: string, job: () => Promise<string>) => {
+    setBusy(id);
+    try {
+      toast.success(await job());
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -70,6 +89,47 @@ export function SettingsDialog() {
               Replay the welcome tour
             </button>
           </form>
+
+          <div className="mt-2 border-t border-line pt-4">
+            <p className="text-sm font-medium text-ink">Your data</p>
+            <p className="mt-0.5 text-xs text-ink-soft">Take a copy with you, or put your deadlines in your calendar.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {[
+                {
+                  id: "ics",
+                  label: "Calendar (.ics)",
+                  job: async () => {
+                    const n = await exportDeadlinesIcs();
+                    return n ? `${n} deadline${n === 1 ? "" : "s"} exported. Open the file to add them to your calendar.` : "No open deadlines to export.";
+                  },
+                },
+                {
+                  id: "json",
+                  label: "Full backup (JSON)",
+                  job: async () => {
+                    const r = await exportBackup();
+                    return r.failed.length ? `Backup saved, but ${r.failed.join(", ")} could not be read.` : "Backup saved.";
+                  },
+                },
+                { id: "habits", label: "Habit history (CSV)", job: async () => `${await exportHabitCsv()} check-ins exported.` },
+                { id: "study", label: "Courses & lectures (CSV)", job: async () => `${await exportStudyCsv()} lectures exported.` },
+                { id: "deadlines", label: "Deadlines (CSV)", job: async () => `${await exportDeadlinesCsv()} deadlines exported.` },
+              ].map((b) => (
+                <Button
+                  key={b.id}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-auto whitespace-normal py-2 text-xs"
+                  disabled={busy !== null}
+                  onClick={() => run(b.id, b.job)}
+                >
+                  {busy === b.id ? "Preparing…" : b.label}
+                </Button>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-ink-soft">Photo files aren't included in the backup, only their records.</p>
+          </div>
         </DialogContent>
       </Dialog>
     </>

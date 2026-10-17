@@ -111,7 +111,7 @@ export function WelcomeTour() {
       body: (
         <p>
           Tick your habits to {em("stamp")} them and build streaks. Every tick earns points you can spend on treats you
-          choose yourself. Tap the {em("✦ pill")} in the corner to see them.
+          choose yourself. Tap the {em("✦ pill")} in the corner to spend them, or to dress me up and change the app's color.
         </p>
       ),
     },

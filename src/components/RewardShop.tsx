@@ -3,10 +3,12 @@ import { Gift, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { BuddyShop } from "@/components/BuddyShop";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { getCityProgress, POINTS } from "@/lib/city.functions";
+import { isPurchase } from "@/lib/customize";
 
 /** Points earned minus points spent, plus the reward list. Shared by the chip and the dialog. */
 export function useRewards() {
@@ -51,6 +53,7 @@ export function RewardsDialog({ onClose }: { onClose: () => void }) {
   const { total, spent, balance, shop } = useRewards();
   const [title, setTitle] = useState("");
   const [cost, setCost] = useState("100");
+  const [tab, setTab] = useState<"treats" | "buddy">("treats");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -126,6 +129,30 @@ export function RewardsDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
+        <div className="mt-4 inline-flex rounded-full bg-paper p-1 ring-1 ring-black/5">
+          {(
+            [
+              ["treats", "Treats"],
+              ["buddy", "Make it yours"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              aria-pressed={tab === id}
+              onClick={() => setTab(id)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                tab === id ? "bg-cream text-ink shadow-sm ring-1 ring-black/5" : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "buddy" ? (
+          <BuddyShop balance={balance} history={shop.data?.history ?? []} />
+        ) : (
+          <>
         <p className="mt-4 text-xs text-ink-soft">
           Habit +{POINTS.habit} · Lecture +{POINTS.lecture} · Assignment +{POINTS.assignment} · Finishing early earns a
           bonus. Spend points on treats you set yourself.
@@ -184,17 +211,19 @@ export function RewardsDialog({ onClose }: { onClose: () => void }) {
           </Button>
         </form>
 
-        {(shop.data?.history.length ?? 0) > 0 && (
+        {(shop.data?.history ?? []).filter((h) => !isPurchase(h.title)).length > 0 && (
           <div className="mt-5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">Recently enjoyed</p>
             <ul className="mt-2 space-y-1 text-sm text-ink-soft">
-              {shop.data!.history.slice(0, 5).map((h) => (
+              {shop.data!.history.filter((h) => !isPurchase(h.title)).slice(0, 5).map((h) => (
                 <li key={h.id}>
                   🎁 {h.title} · −{h.cost}
                 </li>
               ))}
             </ul>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

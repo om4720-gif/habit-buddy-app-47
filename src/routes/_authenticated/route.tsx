@@ -3,6 +3,7 @@ import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouteContext }
 import { supabase } from "@/integrations/supabase/client";
 import { MeroFloating } from "@/components/MeroFloating";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { ThemeApplier } from "@/components/ThemeApplier";
 import { WelcomeTour } from "@/components/WelcomeTour";
 import { useUserSettings } from "@/lib/useUserSettings";
 
@@ -61,6 +62,7 @@ function AppLayout() {
       </nav>
       <Outlet />
       <MeroFloating />
+      <ThemeApplier />
       <WelcomeTour />
     </div>
   );
