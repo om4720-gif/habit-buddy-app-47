@@ -4,7 +4,7 @@ import { stepCountIs, streamText, tool, type LanguageModel } from "ai";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { bestMatch, titleNumber } from "@/lib/mero-match";
+import { bestMatch, parseQuickCommand, titleNumber } from "@/lib/mero-match";
 import {
   getFallbackAI,
   isOutOfCredits,
@@ -92,42 +92,125 @@ export const askMero = createServerFn({ method: "POST" })
       return { error: say(`I couldn't find a course called "${q}".`, `مالقيتش كورس اسمه "${q}".`) };
     };
 
+    type LectureRow = (typeof lectureRows)[number];
+    type MarkResult = { label: string; note?: string | undefined } | { error: string };
+
+    // Marks a lecture/tutorial. The course may be missing or misheard: then work it out from the
+    // number and what is already done (e.g. lecture 3 is next up in only one course).
+    const markLecture = async (a: {
+      course?: string | undefined;
+      kind: "lecture" | "tutorial";
+      number?: number | undefined;
+      title?: string | undefined;
+      studied: boolean;
+    }): Promise<MarkResult> => {
+      const inKind = (courseId: string) => lectureRows.filter((l) => l.course_id === courseId && l.kind === a.kind);
+      const pick = (courseId: string): LectureRow | undefined => {
+        const pool = inKind(courseId);
+        if (a.number != null) return pool.find((l) => titleNumber(l.title) === a.number);
+        if (a.title) {
+          const m = bestMatch(a.title, pool, (l) => [l.title]);
+          return "item" in m ? m.item : undefined;
+        }
+        return undefined;
+      };
+      const what = String(a.number ?? a.title ?? "");
+
+      let course: (typeof courseRows)[number] | undefined;
+      let item: LectureRow | undefined;
+      let note: string | undefined;
+
+      if (a.course) {
+        const m = bestMatch(a.course, courseRows, (c) => [c.name, c.code ?? ""]);
+        if ("ambiguous" in m) {
+          const list = m.ambiguous.map((c) => c.name);
+          return { error: say(`Which course: ${list.join(" or ")}?`, `تقصد أنهي كورس: ${list.join(" ولا ")}؟`) };
+        }
+        if ("item" in m) {
+          course = m.item;
+          item = pick(course.id);
+          if (!item)
+            return {
+              error: say(
+                `I couldn't find ${a.kind} ${what} in ${course.name}.`,
+                `مالقيتش ${kindAr(a.kind)} ${what} في ${course.name}.`,
+              ),
+            };
+        } else {
+          note = say(
+            `I wasn't sure what "${a.course}" was, so I used the course where this one was next.`,
+            `مفهمتش "${a.course}" فاخترت الكورس اللي دوره في المحاضرة دي.`,
+          );
+        }
+      }
+
+      if (!course || !item) {
+        const cands = courseRows.flatMap((c) => {
+          const it = pick(c.id);
+          return it ? [{ course: c, item: it }] : [];
+        });
+        if (cands.length === 0)
+          return {
+            error: say(`I couldn't find ${a.kind} ${what} in any course.`, `مالقيتش ${kindAr(a.kind)} ${what} في أي كورس.`),
+          };
+        const needed = cands.filter((c) => c.item.completed !== a.studied);
+        if (needed.length === 0)
+          return {
+            error: say(
+              `${a.kind} ${what} is already ${a.studied ? "marked as studied" : "unmarked"}.`,
+              `${kindAr(a.kind)} ${what} متعلمة بالفعل.`,
+            ),
+          };
+        let chosen = needed;
+        if (needed.length > 1) {
+          // Prefer the course where the previous one is done: that's the one you are up to.
+          const next = needed.filter(
+            (c) =>
+              a.number === 1 ||
+              (a.number != null &&
+                inKind(c.course.id).some((l) => titleNumber(l.title) === a.number! - 1 && l.completed)),
+          );
+          if (next.length === 1) chosen = next;
+        }
+        if (chosen.length > 1) {
+          const list = chosen.map((c) => c.course.name);
+          return {
+            error: say(
+              `Which course is ${a.kind} ${what} in: ${list.join(" or ")}?`,
+              `${kindAr(a.kind)} ${what} في أنهي كورس: ${list.join(" ولا ")}؟`,
+            ),
+          };
+        }
+        course = chosen[0]!.course;
+        item = chosen[0]!.item;
+      }
+
+      const { error } = await sb
+        .from("lectures")
+        .update({ completed: a.studied, updated_at: new Date().toISOString() } as never)
+        .eq("id", item.id);
+      if (error) return { error: error.message };
+      item.completed = a.studied;
+      return { label: `${course.name} · ${item.title}${a.studied ? "" : " (unmarked)"}`, note };
+    };
+    const notes: string[] = [];
+
     const tools = {
       set_lecture_studied: tool({
-        description: "Mark a lecture or tutorial as studied (or not studied). Identify it by course name, kind and number.",
+        description:
+          "Mark a lecture or tutorial as studied (or not studied). Give the course name if the user said one, the kind and the number.",
         inputSchema: z.object({
-          course: z.string().describe("Course name exactly as written in DATA"),
+          course: z.string().optional().describe("Course name as written in DATA. Omit it if the user did not say one"),
           kind: z.enum(["lecture", "tutorial"]),
           number: z.number().int().optional().describe("The lecture/tutorial number, e.g. 3"),
           title: z.string().optional().describe("Only for items without a number: their title"),
           studied: z.boolean(),
         }),
         execute: async (a) => {
-          const found = findCourse(a.course);
-          if ("error" in found) return fail(found.error);
-          const pool = lectureRows.filter((l) => l.course_id === found.course.id && l.kind === a.kind);
-          let target: (typeof pool)[number] | undefined;
-          if (a.number != null) target = pool.find((l) => titleNumber(l.title) === a.number);
-          else if (a.title) {
-            const m = bestMatch(a.title, pool, (l) => [l.title]);
-            if ("item" in m) target = m.item;
-          }
-          if (!target) {
-            const what = String(a.number ?? a.title ?? "");
-            return fail(
-              say(
-                `I couldn't find ${a.kind} ${what} in ${found.course.name}.`,
-                `مالقيتش ${kindAr(a.kind)} ${what} في ${found.course.name}.`,
-              ),
-            );
-          }
-          const { error } = await sb
-            .from("lectures")
-            .update({ completed: a.studied, updated_at: new Date().toISOString() } as never)
-            .eq("id", target.id);
-          if (error) return fail(error.message);
-          target.completed = a.studied;
-          return success(`${found.course.name} · ${target.title}${a.studied ? "" : " (unmarked)"}`);
+          const r = await markLecture(a);
+          if ("error" in r) return fail(r.error);
+          if (r.note) notes.push(r.note);
+          return success(r.label);
         },
       }),
       set_deadline_done: tool({
@@ -223,6 +306,31 @@ export const askMero = createServerFn({ method: "POST" })
       }),
     };
 
+    // Fast path: plain "I finished lecture 3 [course]" needs no AI at all.
+    const quick = lastUser ? parseQuickCommand(lastUser.content) : null;
+    const arabicCourseUnknown =
+      !!quick?.courseQuery &&
+      /[\u0600-\u06FF]/.test(quick.courseQuery) &&
+      "none" in bestMatch(quick.courseQuery, courseRows, (c) => [c.name, c.code ?? ""]);
+    if (quick && !arabicCourseUnknown) {
+      const results: MarkResult[] = [];
+      for (const it of quick.items)
+        results.push(
+          await markLecture({ course: quick.courseQuery || undefined, kind: it.kind, number: it.number, studied: true }),
+        );
+      const labels = results.flatMap((r) => ("label" in r ? [r.label] : []));
+      const errors = results.flatMap((r) => ("error" in r ? [r.error] : []));
+      const quickNotes = [...new Set(results.flatMap((r) => ("label" in r && r.note ? [r.note] : [])))];
+      if (labels.length) changed = true;
+      console.log("Mero quick command:", JSON.stringify({ text: lastUser?.content, labels, errors }));
+      let reply = labels.length
+        ? say(`Done: ${labels.join("; ")}.`, `تمام، خلصت: ${labels.join("، ")}.`)
+        : "";
+      if (errors[0]) reply += `${reply ? " " : ""}${errors[0]}`;
+      if (quickNotes[0]) reply += ` ${quickNotes[0]}`;
+      return { reply, changed };
+    }
+
     const key = process.env["LOVABLE_API_KEY"];
     const fallback = getFallbackAI();
 
@@ -312,6 +420,7 @@ export const askMero = createServerFn({ method: "POST" })
           ? say(`Done: ${list}.`, `تمام، خلصت: ${list}.`) + (toolErrors[0] ? ` ${toolErrors[0]}` : "")
           : say("Done.", "تمام.");
       }
+      if (notes[0]) reply += ` ${notes[0]}`;
       return { reply, changed };
     } catch (e) {
       console.error("Mero chat failed:", e);
