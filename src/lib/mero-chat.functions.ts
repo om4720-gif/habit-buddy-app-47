@@ -4,7 +4,7 @@ import { stepCountIs, streamText, tool, type LanguageModel } from "ai";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { bestMatch, parseQuickCommand, titleNumber } from "@/lib/mero-match";
+import { bestMatch, norm, parseQuickCommand, titleNumber } from "@/lib/mero-match";
 import {
   getFallbackAI,
   isOutOfCredits,
@@ -191,7 +191,50 @@ export const askMero = createServerFn({ method: "POST" })
         .eq("id", item.id);
       if (error) return { error: error.message };
       item.completed = a.studied;
-      return { label: `${course.name} · ${item.title}${a.studied ? "" : " (unmarked)"}`, note };
+      return { label: `${course.name} · ${item.title}`, note };
+    };
+    // Adds a lecture/tutorial. Without a course name it only works when there is a single course.
+    const addLecture = async (a: {
+      course?: string | undefined;
+      kind: "lecture" | "tutorial";
+      title?: string | undefined;
+    }): Promise<MarkResult> => {
+      let course: (typeof courseRows)[number] | undefined;
+      if (a.course) {
+        const found = findCourse(a.course);
+        if ("error" in found) return { error: found.error };
+        course = found.course;
+      } else if (courseRows.length === 1) {
+        course = courseRows[0];
+      } else {
+        const list = courseRows.map((c) => c.name).slice(0, 6);
+        return {
+          error: say(
+            `Which course should I add it to: ${list.join(" or ")}?`,
+            `أضيفها لأنهي كورس: ${list.join(" ولا ")}؟`,
+          ),
+        };
+      }
+      if (!course) return { error: say("You don't have any courses yet.", "لسه معندكش كورسات.") };
+
+      const same = lectureRows.filter((l) => l.course_id === course!.id && l.kind === a.kind);
+      const kindName = a.kind === "lecture" ? "Lecture" : "Tutorial";
+      let title = (a.title ?? "").trim().slice(0, 300);
+      if (!title) {
+        const next = Math.max(0, ...same.map((l) => titleNumber(l.title) ?? 0)) + 1;
+        title = `${kindName} ${next}`;
+      } else if (/^\d+$/.test(title)) {
+        title = `${kindName} ${title}`;
+      } else {
+        title = title.charAt(0).toUpperCase() + title.slice(1);
+      }
+      if (same.some((l) => norm(l.title) === norm(title)))
+        return { error: say(`${course.name} already has "${title}".`, `${course.name} فيها "${title}" بالفعل.`) };
+
+      const { error } = await sb.from("lectures").insert({ course_id: course.id, title, kind: a.kind } as never);
+      if (error) return { error: error.message };
+      lectureRows.push({ id: `new-${title}`, course_id: course.id, title, kind: a.kind, completed: false } as LectureRow);
+      return { label: `${course.name} · ${title}` };
     };
     const notes: string[] = [];
 
@@ -210,7 +253,7 @@ export const askMero = createServerFn({ method: "POST" })
           const r = await markLecture(a);
           if ("error" in r) return fail(r.error);
           if (r.note) notes.push(r.note);
-          return success(r.label);
+          return success(`${r.label}${a.studied ? "" : " (unmarked)"}`);
         },
       }),
       set_deadline_done: tool({
@@ -263,20 +306,17 @@ export const askMero = createServerFn({ method: "POST" })
         },
       }),
       add_lecture: tool({
-        description: "Add a lecture or tutorial to a course, e.g. title 'Lecture 7'.",
+        description:
+          "Add a lecture or tutorial to a course. title is its name, e.g. 'Design' or 'Lecture 7'; leave it out to use the next number.",
         inputSchema: z.object({
-          course: z.string().describe("Course name exactly as written in DATA"),
-          title: z.string(),
+          course: z.string().optional().describe("Course name as written in DATA"),
+          title: z.string().optional(),
           kind: z.enum(["lecture", "tutorial"]),
         }),
         execute: async (a) => {
-          const found = findCourse(a.course);
-          if ("error" in found) return fail(found.error);
-          const { error } = await sb
-            .from("lectures")
-            .insert({ course_id: found.course.id, title: a.title, kind: a.kind } as never);
-          if (error) return fail(error.message);
-          return success(`Added ${a.title} to ${found.course.name}`);
+          const r = await addLecture(a);
+          if ("error" in r) return fail(r.error);
+          return success(`Added ${r.label}`);
         },
       }),
       complete_habit_today: tool({
@@ -306,25 +346,49 @@ export const askMero = createServerFn({ method: "POST" })
       }),
     };
 
-    // Fast path: plain "I finished lecture 3 [course]" needs no AI at all.
+    // Fast path: plain requests ("I finished lecture 3 steel", "unmark lecture 3",
+    // "add a lecture named design to steel course") need no AI at all.
     const quick = lastUser ? parseQuickCommand(lastUser.content) : null;
     const arabicCourseUnknown =
       !!quick?.courseQuery &&
       /[\u0600-\u06FF]/.test(quick.courseQuery) &&
       "none" in bestMatch(quick.courseQuery, courseRows, (c) => [c.name, c.code ?? ""]);
     if (quick && !arabicCourseUnknown) {
+      if (quick.type === "add") {
+        const r = await addLecture({ course: quick.courseQuery || undefined, kind: quick.kind, title: quick.title });
+        console.log("Mero quick add:", JSON.stringify({ text: lastUser?.content, r }));
+        if ("error" in r) return { reply: r.error, changed };
+        changed = true;
+        const what = r.label.split(" · ")[1] ?? r.label;
+        const course = r.label.split(" · ")[0] ?? "";
+        return {
+          reply: say(
+            `Added ${quick.kind} "${what}" to ${course}.`,
+            `ضفت ${kindAr(quick.kind)} "${what}" في ${course}.`,
+          ),
+          changed,
+        };
+      }
+
       const results: MarkResult[] = [];
       for (const it of quick.items)
         results.push(
-          await markLecture({ course: quick.courseQuery || undefined, kind: it.kind, number: it.number, studied: true }),
+          await markLecture({
+            course: quick.courseQuery || undefined,
+            kind: it.kind,
+            number: it.number,
+            studied: quick.studied,
+          }),
         );
       const labels = results.flatMap((r) => ("label" in r ? [r.label] : []));
       const errors = results.flatMap((r) => ("error" in r ? [r.error] : []));
       const quickNotes = [...new Set(results.flatMap((r) => ("label" in r && r.note ? [r.note] : [])))];
       if (labels.length) changed = true;
-      console.log("Mero quick command:", JSON.stringify({ text: lastUser?.content, labels, errors }));
+      console.log("Mero quick command:", JSON.stringify({ text: lastUser?.content, studied: quick.studied, labels, errors }));
       let reply = labels.length
-        ? say(`Done: ${labels.join("; ")}.`, `تمام، خلصت: ${labels.join("، ")}.`)
+        ? quick.studied
+          ? say(`Done: ${labels.join("; ")}.`, `تمام، خلصت: ${labels.join("، ")}.`)
+          : say(`Unmarked: ${labels.join("; ")}.`, `شلت العلامة من: ${labels.join("، ")}.`)
         : "";
       if (errors[0]) reply += `${reply ? " " : ""}${errors[0]}`;
       if (quickNotes[0]) reply += ` ${quickNotes[0]}`;
