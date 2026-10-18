@@ -27,7 +27,7 @@ export function SettingsDialog() {
         onClick={() => setOpen(true)}
         className="rounded-full px-3 py-1.5 text-xs font-medium text-ink-soft transition hover:text-ink"
       >
-        Style your buddy
+        Settings
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
