@@ -251,12 +251,13 @@ function Header({
           <PointsChip balance={balance} onClick={onOpenRewards} />
           <button
             onClick={onOpenCustomize}
-            className="relative grid size-9 place-items-center rounded-full text-ink-soft transition hover:bg-sand hover:text-ink"
-            aria-label="Make it yours: dress up Buddy and change colors"
-            title="Make it yours"
+            className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-sm font-medium text-ink-soft transition hover:bg-sand hover:text-ink"
+            aria-label="Style your buddy"
+            title="Style your buddy"
           >
             <Palette className="size-[18px]" />
-            {showNew && <span className="absolute right-1 top-1 size-2.5 rounded-full bg-rust ring-2 ring-background" />}
+            <span className="hidden whitespace-nowrap sm:inline">Style your buddy</span>
+            {showNew && <span className="absolute left-5 top-1 size-2.5 rounded-full bg-rust ring-2 ring-background" />}
           </button>
           <button
             onClick={onToggleSound}
