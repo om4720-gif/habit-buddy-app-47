@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { getCityProgress, POINTS } from "@/lib/city.functions";
-import { isPurchase } from "@/lib/customize";
+import { isPurchase, markYoursSeen } from "@/lib/customize";
 
 /** Points earned minus points spent, plus the reward list. Shared by the chip and the dialog. */
 export function useRewards() {
@@ -48,12 +48,22 @@ export function PointsChip({ balance, onClick }: { balance: number; onClick: () 
   );
 }
 
-export function RewardsDialog({ onClose }: { onClose: () => void }) {
+export function RewardsDialog({
+  onClose,
+  initialTab = "treats",
+}: {
+  onClose: () => void;
+  initialTab?: "treats" | "buddy";
+}) {
   const qc = useQueryClient();
   const { total, spent, balance, shop } = useRewards();
   const [title, setTitle] = useState("");
   const [cost, setCost] = useState("100");
-  const [tab, setTab] = useState<"treats" | "buddy">("treats");
+  const [tab, setTab] = useState<"treats" | "buddy">(initialTab);
+
+  useEffect(() => {
+    if (tab === "buddy") markYoursSeen();
+  }, [tab]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();

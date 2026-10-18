@@ -8,8 +8,8 @@ import { useUserSettings } from "@/lib/useUserSettings";
 
 const tourKey = (uid: string) => `ritual:tourDone:${uid}`;
 export const OPEN_TOUR_EVENT = "ritual:open-tour";
-const LAST = 5;
-const MOODS: BuddyMood[] = ["wave", "happy", "happy", "ready", "happy", "party"];
+const LAST = 6;
+const MOODS: BuddyMood[] = ["wave", "happy", "happy", "happy", "ready", "happy", "party"];
 
 const em = (t: string) => <strong className="font-semibold text-ink">{t}</strong>;
 
@@ -116,6 +116,16 @@ export function WelcomeTour() {
       ),
     },
     {
+      title: "Dress me up",
+      body: (
+        <p>
+          Points aren't only for treats. Tap the {em("🎨 button")} in the top bar to buy me hats, glasses and new fur
+          colors, or to change the whole app's color. The big items take a while to earn, which is what makes them
+          feel good.
+        </p>
+      ),
+    },
+    {
       title: "University",
       body: (
         <p>
@@ -144,7 +154,7 @@ export function WelcomeTour() {
       ),
     },
     {
-      title: "Make it yours",
+      title: "Your settings",
       body: (
         <div className="space-y-4">
           <p>

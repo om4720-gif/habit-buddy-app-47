@@ -104,8 +104,16 @@ export function BuddyShop({ balance, history }: { balance: number; history: { ti
               <p className="text-xs text-ink-soft">
                 {balance >= pendingInfo.price
                   ? `${pendingInfo.price} pts · you have ${balance}`
-                  : `Needs ${pendingInfo.price - balance} more pts`}
+                  : `${balance} of ${pendingInfo.price} pts · ${pendingInfo.price - balance} to go`}
               </p>
+              {balance < pendingInfo.price && (
+                <div className="mt-1.5 h-1.5 w-40 max-w-full overflow-hidden rounded-full bg-sand/70">
+                  <div
+                    className="h-full rounded-full bg-rust"
+                    style={{ width: `${Math.round((balance / pendingInfo.price) * 100)}%` }}
+                  />
+                </div>
+              )}
             </div>
             <div className="flex shrink-0 gap-2">
               <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setPending(null)}>
@@ -153,6 +161,14 @@ export function BuddyShop({ balance, history }: { balance: number; history: { ti
                   </>
                 )}
               </span>
+              {!has && (
+                <span className="mt-0.5 block h-1 w-full overflow-hidden rounded-full bg-sand/70">
+                  <span
+                    className="block h-full rounded-full bg-rust/70"
+                    style={{ width: `${Math.min(100, Math.round((balance / item.price) * 100))}%` }}
+                  />
+                </span>
+              )}
             </button>
           );
         })}

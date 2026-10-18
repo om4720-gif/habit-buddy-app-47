@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { format, subDays } from "date-fns";
-import { Flame, MoreHorizontal, Plus, Trash2, Volume2, VolumeX } from "lucide-react";
+import { Flame, MoreHorizontal, Palette, Plus, Trash2, Volume2, VolumeX, X } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Buddy, type BuddyMood } from "@/components/Buddy";
 import { HabitTracker } from "@/components/HabitTracker";
 import { habitColor } from "@/lib/habitColors";
+import { markYoursSeen, useYoursSeen } from "@/lib/customize";
 import { PointsChip, RewardsDialog, useRewards } from "@/components/RewardShop";
 import { AddHabitModal } from "@/components/AddHabitModal";
 import {
@@ -39,7 +40,8 @@ function DashboardPage() {
   const date = today();
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
-  const [showRewards, setShowRewards] = useState(false);
+  const [rewardsOpen, setRewardsOpen] = useState<"treats" | "buddy" | null>(null);
+  const yoursSeen = useYoursSeen();
   const [soundOn, setSoundOnState] = useState(isSoundOn);
   const { balance } = useRewards();
 
@@ -96,7 +98,9 @@ function DashboardPage() {
           balance={balance}
           soundOn={soundOn}
           onToggleSound={toggleSound}
-          onOpenRewards={() => setShowRewards(true)}
+          showNew={!yoursSeen}
+          onOpenRewards={() => setRewardsOpen("treats")}
+          onOpenCustomize={() => setRewardsOpen("buddy")}
           onSignOut={handleSignOut}
         />
 
@@ -106,6 +110,30 @@ function DashboardPage() {
           progress={progress}
           onAdd={() => setIsAdding(true)}
         />
+
+        {!yoursSeen && (
+          <div className="mt-4 flex items-center gap-3 rounded-2xl bg-cream px-4 py-3 ring-1 ring-black/5">
+            <span className="text-lg" aria-hidden="true">
+              🎨
+            </span>
+            <p className="min-w-0 flex-1 text-sm text-ink">
+              <span className="font-semibold">New:</span> dress up Buddy and recolor the app with your points.
+            </p>
+            <button
+              onClick={() => setRewardsOpen("buddy")}
+              className="shrink-0 rounded-full bg-rust px-3 py-1.5 text-xs font-semibold text-cream transition hover:bg-rust/90"
+            >
+              Take a look
+            </button>
+            <button
+              onClick={markYoursSeen}
+              aria-label="Dismiss"
+              className="grid size-7 shrink-0 place-items-center rounded-full text-ink-soft transition hover:bg-sand hover:text-ink"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
 
         <section className="mt-10">
           <SectionTitle title="Today" meta={`${completedCount} of ${totalCount} done`} />
@@ -169,7 +197,7 @@ function DashboardPage() {
         />
       )}
 
-      {showRewards && <RewardsDialog onClose={() => setShowRewards(false)} />}
+      {rewardsOpen && <RewardsDialog initialTab={rewardsOpen} onClose={() => setRewardsOpen(null)} />}
     </div>
   );
 }
@@ -190,6 +218,8 @@ function Header({
   soundOn,
   onToggleSound,
   onOpenRewards,
+  onOpenCustomize,
+  showNew,
   onSignOut,
 }: {
   date: string;
@@ -198,6 +228,8 @@ function Header({
   soundOn: boolean;
   onToggleSound: () => void;
   onOpenRewards: () => void;
+  onOpenCustomize: () => void;
+  showNew: boolean;
   onSignOut: () => void;
 }) {
   const displayDate = format(new Date(`${date}T00:00:00`), "EEEE, MMMM d");
@@ -217,6 +249,15 @@ function Header({
             {streak}
           </span>
           <PointsChip balance={balance} onClick={onOpenRewards} />
+          <button
+            onClick={onOpenCustomize}
+            className="relative grid size-9 place-items-center rounded-full text-ink-soft transition hover:bg-sand hover:text-ink"
+            aria-label="Make it yours: dress up Buddy and change colors"
+            title="Make it yours"
+          >
+            <Palette className="size-[18px]" />
+            {showNew && <span className="absolute right-1 top-1 size-2.5 rounded-full bg-rust ring-2 ring-background" />}
+          </button>
           <button
             onClick={onToggleSound}
             className="grid size-9 place-items-center rounded-full text-ink-soft transition hover:bg-sand hover:text-ink"

@@ -20,6 +20,7 @@ const TAP_LINES = [
   "You've got this.",
   "Start with the easiest one.",
   "Finish one thing, then breathe.",
+  "Psst! You can dress me up. Tap the 🎨 up top.",
 ];
 
 const INK = "#2B2118";

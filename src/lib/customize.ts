@@ -4,27 +4,29 @@ import { useSyncExternalStore } from "react";
 // ownership of paid items is kept in the database (as a purchase), so it survives a new device.
 
 export type Slot = "head" | "face" | "neck";
+// Prices are set against what you actually earn: a habit is 5 points, a lecture 10, an assignment 20
+// (plus up to 25 for finishing early). A good day is about 40, a good week 250-350.
 export type ItemDef = { id: string; name: string; emoji: string; slot: Slot; price: number };
 
 export const ITEMS: ItemDef[] = [
-  { id: "party-hat", name: "Party hat", emoji: "🎉", slot: "head", price: 30 },
-  { id: "grad-cap", name: "Graduation cap", emoji: "🎓", slot: "head", price: 50 },
-  { id: "headphones", name: "Headphones", emoji: "🎧", slot: "head", price: 80 },
-  { id: "crown", name: "Crown", emoji: "👑", slot: "head", price: 120 },
-  { id: "glasses", name: "Glasses", emoji: "👓", slot: "face", price: 40 },
-  { id: "sunglasses", name: "Sunglasses", emoji: "😎", slot: "face", price: 60 },
-  { id: "bow-tie", name: "Bow tie", emoji: "🎀", slot: "neck", price: 40 },
-  { id: "scarf", name: "Scarf", emoji: "🧣", slot: "neck", price: 50 },
+  { id: "party-hat", name: "Party hat", emoji: "🎉", slot: "head", price: 150 },
+  { id: "grad-cap", name: "Graduation cap", emoji: "🎓", slot: "head", price: 400 },
+  { id: "headphones", name: "Headphones", emoji: "🎧", slot: "head", price: 600 },
+  { id: "crown", name: "Crown", emoji: "👑", slot: "head", price: 1200 },
+  { id: "glasses", name: "Glasses", emoji: "👓", slot: "face", price: 200 },
+  { id: "sunglasses", name: "Sunglasses", emoji: "😎", slot: "face", price: 450 },
+  { id: "bow-tie", name: "Bow tie", emoji: "🎀", slot: "neck", price: 200 },
+  { id: "scarf", name: "Scarf", emoji: "🧣", slot: "neck", price: 250 },
 ];
 
 export type FurDef = { id: string; name: string; color: string | null; price: number };
 export const FURS: FurDef[] = [
   { id: "rust", name: "Classic", color: null, price: 0 }, // follows the app theme
-  { id: "teal", name: "Teal", color: "#2F7D6B", price: 40 },
-  { id: "blue", name: "Blue", color: "#4A6FA5", price: 40 },
-  { id: "purple", name: "Purple", color: "#8E5BA8", price: 40 },
-  { id: "rose", name: "Rose", color: "#C2547B", price: 40 },
-  { id: "olive", name: "Olive", color: "#5E8C3A", price: 40 },
+  { id: "teal", name: "Teal", color: "#2F7D6B", price: 350 },
+  { id: "blue", name: "Blue", color: "#4A6FA5", price: 350 },
+  { id: "purple", name: "Purple", color: "#8E5BA8", price: 350 },
+  { id: "rose", name: "Rose", color: "#C2547B", price: 350 },
+  { id: "olive", name: "Olive", color: "#5E8C3A", price: 350 },
 ];
 
 export type ThemeDef = { id: string; name: string; value: string | null; swatch: string };
@@ -118,6 +120,18 @@ export function applyTheme(id: string) {
   if (value) root.style.setProperty("--rust", value);
   else root.style.removeProperty("--rust");
 }
+
+// ---- has the person looked at "Make it yours" yet? (drives the "New" nudge) ----
+const SEEN_KEY = "ritual:yoursSeen";
+const seenSnapshot = () => {
+  try {
+    return localStorage.getItem(SEEN_KEY) === "1";
+  } catch {
+    return true; // can't remember it, so don't nag
+  }
+};
+export const useYoursSeen = (): boolean => useSyncExternalStore(subscribe, seenSnapshot, () => true);
+export const markYoursSeen = () => writeRaw(SEEN_KEY, "1");
 
 // ---- ownership: a paid item is stored as a redemption titled "Buddy item: <id>" ----
 export const PURCHASE_PREFIX = "Buddy item: ";
