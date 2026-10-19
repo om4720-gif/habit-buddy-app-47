@@ -186,7 +186,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
           setFolder(name);
           setConfirmDelete(false);
         }}
-        className="flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-accent/40"
+        className="flex min-w-0 items-start gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-accent/40"
       >
         <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface-2">
           {items[0]?.url ? (
@@ -195,8 +195,8 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
             <Folder className="size-4 text-ink-soft" />
           )}
         </span>
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium">{label ?? name}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block whitespace-normal break-words text-sm font-medium">{label ?? name}</span>
           <span className="block text-[11px] text-ink-soft">
             {items.length} {items.length === 1 ? "photo" : "photos"}
           </span>
@@ -207,7 +207,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
 
   return (
     <div className="border-t border-line px-5 py-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <p className="flex min-w-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
           {folder != null && (
             <button
@@ -221,12 +221,12 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
               <ChevronLeft className="size-3.5" />
             </button>
           )}
-          <span className="truncate">
+          <span className="whitespace-normal break-words">
             {folder ?? `Tutorial photos · ${photos.length}`}
           </span>
         </p>
         {folder != null && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0">
             {confirmDelete ? (
               <Button size="sm" variant="destructive" onClick={deleteFolder}>
                 Remove folder?
@@ -264,7 +264,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
               No folders yet — create one like "Tut 1" to start saving photos.
             </p>
           )}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {folders.map((f) => tile(f.name))}
             {unsorted.length > 0 && tile(null, "Unsorted")}
             {adding ? (
