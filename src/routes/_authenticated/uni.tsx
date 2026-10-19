@@ -399,6 +399,22 @@ function UniPage() {
     }
   }
 
+  const lectureItems = lectures.filter((lecture) => lecture.kind !== "tutorial");
+  const tutorialItems = lectures.filter((lecture) => lecture.kind === "tutorial");
+  const lectureRate = lectureItems.length
+    ? Math.round((lectureItems.filter((lecture) => lecture.completed).length / lectureItems.length) * 100)
+    : 0;
+  const tutorialRate = tutorialItems.length
+    ? Math.round((tutorialItems.filter((tutorial) => tutorial.completed).length / tutorialItems.length) * 100)
+    : 0;
+  const lectureStudied = lectureItems.filter((lecture) => lecture.completed).length;
+  const tutorialStudied = tutorialItems.filter((tutorial) => tutorial.completed).length;
+  const totalStudied = lectureStudied + tutorialStudied;
+  const totalSessions = lectureItems.length + tutorialItems.length;
+  const overallRate = totalSessions
+    ? Math.round((totalStudied / totalSessions) * 100)
+    : 0;
+
   return (
     <main className="mx-auto flex max-w-4xl flex-col px-6 py-10 sm:px-8 animate-rise">
       <header className="mb-8">
@@ -406,12 +422,13 @@ function UniPage() {
           {selectedCourse ? (
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               onClick={() => setSelectedCourseId(null)}
-              className="-ml-2 size-9 text-ink hover:bg-cream"
+              className="-ml-2 h-9 px-2 text-ink hover:bg-cream"
               aria-label="Back to courses"
             >
-              <ArrowLeft className="size-5" />
+              <ArrowLeft className="mr-2 size-4" />
+              All courses
             </Button>
           ) : (
             <GraduationCap className="size-5" />
@@ -453,6 +470,44 @@ function UniPage() {
           </Button>
         </div>
       </header>
+
+      {!selectedCourse && (
+        <section className="order-1 mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-line bg-card p-5 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
+              Overall studied
+            </p>
+            <p className="mt-1 font-display text-2xl text-ink">{overallRate}%</p>
+            <p className="text-xs text-ink-soft">
+              {totalStudied}/{totalSessions} across all courses
+            </p>
+          </div>
+          <div className="rounded-xl border border-line bg-card p-5 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
+              Courses
+            </p>
+            <p className="mt-1 font-display text-2xl text-ink">{courses.length}</p>
+          </div>
+          <div className="rounded-xl border border-line bg-card p-5 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
+              Lectures studied
+            </p>
+            <p className="mt-1 font-display text-2xl text-ink">{lectureRate}%</p>
+            <p className="text-xs text-ink-soft">
+              {lectureItems.filter((lecture) => lecture.completed).length}/{lectureItems.length} across all courses
+            </p>
+          </div>
+          <div className="rounded-xl border border-line bg-card p-5 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
+              Tutorials studied
+            </p>
+            <p className="mt-1 font-display text-2xl text-ink">{tutorialRate}%</p>
+            <p className="text-xs text-ink-soft">
+              {tutorialItems.filter((tutorial) => tutorial.completed).length}/{tutorialItems.length} across all courses
+            </p>
+          </div>
+        </section>
+      )}
 
       <div className="order-2">
       {permission !== "granted" && (
@@ -878,7 +933,9 @@ function UniPage() {
           </Button>
         </div>
       ) : (
-        <div className="order-1 mb-8 grid gap-4 sm:grid-cols-2">
+        <div
+          className={`order-1 mb-8 grid gap-4 ${selectedCourse ? "grid-cols-1" : "sm:grid-cols-2"}`}
+        >
           {courses.map((course) => {
             const courseItems = lecturesByCourse.get(course.id) ?? [];
             const studiedCount = courseItems.filter((item) => item.completed).length;
@@ -1018,7 +1075,7 @@ function UniPage() {
                   </DropdownMenu>
                 </div>
 
-                <div className="grid grid-cols-4 border-b border-line">
+                <div className="grid grid-cols-2 border-b border-line sm:grid-cols-4">
                   {([
                     ["lectures", "Lectures", BookOpen],
                     ["tutorials", "Tutorials", BookOpen],
