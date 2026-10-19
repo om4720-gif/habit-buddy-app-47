@@ -1,8 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { differenceInCalendarDays, format } from "date-fns";
 import {
+  ArrowLeft,
   Bell,
+  BookOpen,
+  CalendarDays,
+  Camera,
   Check,
+  FolderClosed,
   GraduationCap,
   MoreHorizontal,
   Pencil,
@@ -74,6 +79,8 @@ function UniPage() {
   });
 
   const [courseDialogOpen, setCourseDialogOpen] = useState(false);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"lectures" | "tutorials" | "deadlines" | "photos">("lectures");
   const [lectureDialogOpen, setLectureDialogOpen] = useState(false);
   const [lectureCourseId, setLectureCourseId] = useState<string>("");
   const [courseForm, setCourseForm] = useState({ name: "", code: "", lectures: "", tutorials: "" });
@@ -92,6 +99,8 @@ function UniPage() {
     queryKey: ["deadlines"],
     queryFn: () => fetchDeadlines(),
   });
+
+  const selectedCourse = courses.find((course) => course.id === selectedCourseId);
 
   const [deadlineDialogOpen, setDeadlineDialogOpen] = useState(false);
   const [deadlineForm, setDeadlineForm] = useState({
@@ -303,6 +312,7 @@ function UniPage() {
       await deleteCourseFn({ data: { courseId } });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["lectures"] });
+      if (selectedCourseId === courseId) setSelectedCourseId(null);
       toast.success("Course removed");
     } catch (err) {
       toast.error("Could not remove course");
@@ -389,29 +399,34 @@ function UniPage() {
     }
   }
 
-  const lectureItems = lectures.filter((l) => l.kind !== "tutorial");
-  const tutorialItems = lectures.filter((l) => l.kind === "tutorial");
-  const rate = (items: typeof lectures) =>
-    items.length
-      ? Math.round((items.filter((l) => l.completed).length / items.length) * 100)
-      : 0;
-  const lectureRate = rate(lectureItems);
-  const tutorialRate = rate(tutorialItems);
-
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10 sm:px-8 animate-rise">
+    <main className="mx-auto flex max-w-4xl flex-col px-6 py-10 sm:px-8 animate-rise">
       <header className="mb-8">
         <div className="flex items-center gap-2 text-rust">
-          <GraduationCap className="size-5" />
+          {selectedCourse ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedCourseId(null)}
+              className="-ml-2 size-9 text-ink hover:bg-cream"
+              aria-label="Back to courses"
+            >
+              <ArrowLeft className="size-5" />
+            </Button>
+          ) : (
+            <GraduationCap className="size-5" />
+          )}
           <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">
             University
           </span>
         </div>
         <h1 className="mt-2 font-display text-3xl font-medium text-ink sm:text-4xl">
-          Course tracker
+          {selectedCourse?.name ?? "Course folders"}
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
-          Keep track of which lectures and tutorials you have studied and finished.
+          {selectedCourse
+            ? selectedCourse.code ?? "Course workspace"
+            : "Your lectures, deadlines, and notes in one place."}
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <VoiceButton
@@ -419,9 +434,6 @@ function UniPage() {
             label="Add by voice"
             idleTitle="Say the course, lecture or tutorial, and its number"
           />
-          <p className="text-xs text-ink-soft">
-            Say something like “Physics lecture 3” or “Math tutorial 2”.
-          </p>
           <Button
             variant="outline"
             size="sm"
@@ -442,33 +454,7 @@ function UniPage() {
         </div>
       </header>
 
-      <section className="mb-8 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
-            Courses
-          </p>
-          <p className="mt-1 font-display text-2xl text-ink">{courses.length}</p>
-        </div>
-        <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
-            Lectures studied
-          </p>
-          <p className="mt-1 font-display text-2xl text-ink">{lectureRate}%</p>
-          <p className="text-xs text-ink-soft">
-            {lectureItems.filter((l) => l.completed).length}/{lectureItems.length}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-soft">
-            Tutorials studied
-          </p>
-          <p className="mt-1 font-display text-2xl text-ink">{tutorialRate}%</p>
-          <p className="text-xs text-ink-soft">
-            {tutorialItems.filter((l) => l.completed).length}/{tutorialItems.length}
-          </p>
-        </div>
-      </section>
-
+      <div className="order-2">
       {permission !== "granted" && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-card px-5 py-3 text-xs text-ink-soft">
           <span>
@@ -622,6 +608,7 @@ function UniPage() {
       </section>
         );
       })}
+      </div>
 
       <Dialog open={deadlineDialogOpen} onOpenChange={setDeadlineDialogOpen}>
         <DialogContent className="rounded-2xl border-line bg-card">
@@ -781,7 +768,7 @@ function UniPage() {
         </DialogContent>
       </Dialog>
 
-      <section className="mb-6 flex items-center justify-between">
+      <section className="order-1 mb-6 flex items-center justify-between">
         <Dialog open={courseDialogOpen} onOpenChange={setCourseDialogOpen}>
           <DialogTrigger asChild>
             <Button
@@ -878,8 +865,9 @@ function UniPage() {
         </Dialog>
       </section>
 
-      {courses.length === 0 ? (
+      {courses.length === 0 && !selectedCourse ? (
         <div className="rounded-2xl border border-dashed border-line bg-card p-10 text-center">
+          <FolderClosed className="mx-auto size-8 text-ink-soft" />
           <p className="text-sm text-ink-soft">No courses yet.</p>
           <Button
             variant="ghost"
@@ -890,9 +878,17 @@ function UniPage() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="order-1 mb-8 grid gap-4 sm:grid-cols-2">
           {courses.map((course) => {
             const courseItems = lecturesByCourse.get(course.id) ?? [];
+            const studiedCount = courseItems.filter((item) => item.completed).length;
+            const progress = courseItems.length
+              ? Math.round((studiedCount / courseItems.length) * 100)
+              : 0;
+            const dueCount = upcomingDeadlines.filter(
+              (deadline) => deadline.course_id === course.id,
+            ).length;
+            const circumference = 113.1;
             const byDate = (items: typeof courseItems) =>
               items
                 .slice()
@@ -918,6 +914,65 @@ function UniPage() {
                 items: byDate(courseItems.filter((l) => l.kind === "tutorial")),
               },
             ];
+
+            if (!selectedCourse) {
+              return (
+                <button
+                  key={course.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCourseId(course.id);
+                    setActiveTab("lectures");
+                  }}
+                  className="group relative overflow-hidden rounded-xl border border-line bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-rust/40 hover:shadow-md"
+                >
+                  <span
+                    className="absolute inset-x-0 top-0 h-1.5"
+                    style={{ backgroundColor: course.color ?? "#CE552F" }}
+                  />
+                  <span className="flex items-start justify-between gap-4 pt-1">
+                    <span className="min-w-0">
+                      <FolderClosed
+                        className="mb-4 size-6"
+                        style={{ color: course.color ?? "#CE552F" }}
+                      />
+                      <span className="block truncate font-display text-xl font-medium text-ink">
+                        {course.name}
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-ink-soft">
+                        {course.code || `${courseItems.length} sessions`}
+                      </span>
+                    </span>
+                    <span className="relative mt-1 flex size-12 shrink-0 items-center justify-center">
+                      <svg viewBox="0 0 44 44" className="absolute inset-0 size-full -rotate-90">
+                        <circle cx="22" cy="22" r="18" fill="none" stroke="currentColor" strokeWidth="3" className="text-line" />
+                        <circle
+                          cx="22"
+                          cy="22"
+                          r="18"
+                          fill="none"
+                          stroke={course.color ?? "#CE552F"}
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={circumference * (1 - progress / 100)}
+                        />
+                      </svg>
+                      <span className="text-[10px] font-semibold text-ink">{progress}%</span>
+                    </span>
+                  </span>
+                  <span className="mt-5 flex items-center justify-between gap-2 border-t border-line pt-3">
+                    <span className="text-xs text-ink-soft">
+                      {studiedCount} of {courseItems.length} studied
+                    </span>
+                    <span className="rounded-full bg-cream px-2.5 py-1 text-[11px] font-semibold text-ink">
+                      {dueCount} due
+                    </span>
+                  </span>
+                </button>
+              );
+            }
+            if (selectedCourse.id !== course.id) return null;
 
             return (
               <section
@@ -963,7 +1018,36 @@ function UniPage() {
                   </DropdownMenu>
                 </div>
 
-                {groups.map((group) => {
+                <div className="grid grid-cols-4 border-b border-line">
+                  {([
+                    ["lectures", "Lectures", BookOpen],
+                    ["tutorials", "Tutorials", BookOpen],
+                    ["deadlines", "Deadlines", CalendarDays],
+                    ["photos", "Photos & notes", Camera],
+                  ] as const).map(([tab, label, Icon]) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setActiveTab(tab)}
+                      className={`min-h-12 truncate border-b-2 px-1 text-xs font-semibold transition sm:text-sm ${
+                        activeTab === tab
+                          ? "border-rust text-rust"
+                          : "border-transparent text-ink-soft hover:text-ink"
+                      }`}
+                    >
+                      <Icon className="mr-1 inline size-4 align-text-bottom" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {(activeTab === "lectures" || activeTab === "tutorials") && groups
+                  .filter((group) =>
+                    activeTab === "tutorials"
+                      ? group.kind === "tutorial"
+                      : group.kind === "lecture",
+                  )
+                  .map((group) => {
                   const studied = group.items.filter((l) => l.completed).length;
                   const percent = group.items.length
                     ? Math.round((studied / group.items.length) * 100)
@@ -1063,7 +1147,56 @@ function UniPage() {
                     </div>
                   );
                 })}
-                <CoursePhotos courseId={course.id} />
+                {activeTab === "deadlines" && (
+                  <div className="divide-y divide-line">
+                    <div className="flex items-center justify-between px-5 py-3">
+                      <p className="text-sm font-medium text-ink">Upcoming deadlines</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setDeadlineForm({
+                            courseId: course.id,
+                            title: "",
+                            kind: "assignment",
+                            dueDate: format(new Date(), "yyyy-MM-dd"),
+                          });
+                          setDeadlineDialogOpen(true);
+                        }}
+                        className="rounded-full border-line bg-card text-ink hover:bg-cream"
+                      >
+                        <Plus className="mr-1 size-4" /> Deadline
+                      </Button>
+                    </div>
+                    {upcomingDeadlines.filter((deadline) => deadline.course_id === course.id).length === 0 ? (
+                      <p className="px-5 py-6 text-center text-sm text-ink-soft">
+                        No upcoming deadlines for this course.
+                      </p>
+                    ) : (
+                      upcomingDeadlines
+                        .filter((deadline) => deadline.course_id === course.id)
+                        .map((deadline) => (
+                          <div key={deadline.id} className="flex items-center justify-between px-5 py-4">
+                            <div>
+                              <p className="font-medium text-ink">{deadline.title}</p>
+                              <p className="mt-0.5 text-xs capitalize text-ink-soft">
+                                {deadline.kind} · {format(new Date(`${deadline.due_date}T00:00:00`), "MMM d, yyyy")}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => openEditDeadline(deadline)} className="text-ink-muted hover:text-rust" aria-label="Edit deadline">
+                                <Pencil className="size-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => removeDeadline(deadline.id)} className="text-ink-muted hover:text-rust" aria-label="Remove deadline">
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                )}
+                {activeTab === "photos" && <CoursePhotos courseId={course.id} />}
               </section>
             );
           })}
