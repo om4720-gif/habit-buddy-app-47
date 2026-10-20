@@ -1,15 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { differenceInCalendarDays, format } from "date-fns";
 import {
+  ArrowLeft,
   Bell,
   Check,
+  FolderClosed,
   GraduationCap,
   MoreHorizontal,
   Pencil,
   Plus,
   Trash2,
   ChevronDown,
-  Search,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -414,7 +415,7 @@ function UniPage() {
   const lectureRate = rate(lectureItems);
   const tutorialRate = rate(tutorialItems);
 
-  // ---- organizing the page: tabs, one course at a time, a course switcher with search ----
+  // ---- organizing the page: tabs and course folders ----
   const readLS = (k: string) => {
     try {
       return localStorage.getItem(k);
@@ -432,8 +433,7 @@ function UniPage() {
   const [tab, setTab] = useState<"courses" | "deadlines">(() =>
     readLS("uni:tab") === "deadlines" ? "deadlines" : "courses",
   );
-  const [selectedId, setSelectedId] = useState<string | null>(() => readLS("uni:course"));
-  const [courseSearch, setCourseSearch] = useState("");
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [shownStudied, setShownStudied] = useState<Set<string>>(new Set());
   const [photosOpen, setPhotosOpen] = useState<Set<string>>(new Set());
   const toggleIn = (set: Set<string>, key: string) => {
@@ -443,44 +443,36 @@ function UniPage() {
     return next;
   };
 
-  const selectedCourse = courses.find((c) => c.id === selectedId) ?? courses[0];
-  const selectedCourseId = selectedCourse?.id;
-  const visibleCourses = selectedCourse ? [selectedCourse] : [];
-  const q = courseSearch.trim().toLowerCase();
-  const filteredCourses = q
-    ? courses.filter((c) => `${c.name} ${c.code ?? ""}`.toLowerCase().includes(q))
-    : courses;
-  const courseProgress = (id: string) => {
-    const items = lecturesByCourse.get(id) ?? [];
-    return items.length
-      ? Math.round((items.filter((l) => l.completed).length / items.length) * 100)
-      : 0;
-  };
+  const selectedCourse = courses.find((course) => course.id === selectedCourseId);
 
   useEffect(() => writeLS("uni:tab", tab), [tab]);
-  useEffect(() => {
-    if (selectedCourseId) writeLS("uni:course", selectedCourseId);
-  }, [selectedCourseId]);
-  // keep the chosen course in view in the switcher
-  useEffect(() => {
-    if (selectedCourseId && tab === "courses")
-      document
-        .getElementById(`chip-${selectedCourseId}`)
-        ?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, [selectedCourseId, tab]);
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10 sm:px-8 animate-rise">
       <header className="mb-8">
         <div className="flex items-center gap-2 text-rust">
-          <GraduationCap className="size-5" />
+          {selectedCourse ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedCourseId(null)}
+              className="-ml-2 size-9 text-ink hover:bg-cream"
+              aria-label="Back to courses"
+            >
+              <ArrowLeft className="size-5" />
+            </Button>
+          ) : (
+            <GraduationCap className="size-5" />
+          )}
           <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">University</span>
         </div>
         <h1 className="mt-2 font-display text-3xl font-medium text-ink sm:text-4xl">
-          Course tracker
+          {selectedCourse?.name ?? "Course folders"}
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
-          Keep track of which lectures and tutorials you have studied and finished.
+          {selectedCourse
+            ? (selectedCourse.code ?? "Course workspace")
+            : "Your lectures, deadlines, and notes in one place."}
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <VoiceButton
@@ -988,69 +980,13 @@ function UniPage() {
               </DialogContent>
             </Dialog>
           </section>
-
-          {courses.length > 0 && (
-            <div className="sticky top-[61px] z-30 -mx-6 mb-4 border-b border-line bg-background/95 px-6 py-2 backdrop-blur-sm sm:-mx-8 sm:px-8">
-              {courses.length >= 3 && (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (filteredCourses[0]) {
-                      setSelectedId(filteredCourses[0].id);
-                      setCourseSearch("");
-                    }
-                  }}
-                  className="relative mb-2"
-                >
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-                  <Input
-                    value={courseSearch}
-                    onChange={(e) => setCourseSearch(e.target.value)}
-                    placeholder="Find a course"
-                    aria-label="Find a course"
-                    className="h-9 rounded-full border-line bg-card pl-9 text-sm text-ink"
-                  />
-                </form>
-              )}
-              <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Courses">
-                {filteredCourses.length === 0 && (
-                  <p className="py-1 text-sm text-ink-soft">No course matches "{courseSearch}".</p>
-                )}
-                {filteredCourses.map((c) => {
-                  const active = selectedCourse?.id === c.id;
-                  return (
-                    <button
-                      key={c.id}
-                      id={`chip-${c.id}`}
-                      role="tab"
-                      aria-selected={active}
-                      onClick={() => setSelectedId(c.id)}
-                      className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                        active ? "bg-ink text-cream" : "bg-cream text-ink hover:bg-sand"
-                      }`}
-                    >
-                      <span
-                        className="size-2.5 rounded-full"
-                        style={{ backgroundColor: c.color ?? "#CE552F" }}
-                      />
-                      <span className="max-w-[11rem] truncate">{c.name}</span>
-                      <span
-                        className={`text-xs tabular-nums ${active ? "text-cream/70" : "text-ink-soft"}`}
-                      >
-                        {courseProgress(c.id)}%
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </>
       )}
 
       {tab === "courses" &&
         (courses.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line bg-card p-10 text-center">
+            <FolderClosed className="mx-auto size-8 text-ink-soft" />
             <p className="text-sm text-ink-soft">No courses yet.</p>
             <Button
               variant="ghost"
@@ -1061,9 +997,16 @@ function UniPage() {
             </Button>
           </div>
         ) : (
-          <div>
-            {visibleCourses.map((course) => {
+          <div className={selectedCourse ? "" : "grid gap-4 sm:grid-cols-2"}>
+            {courses.map((course) => {
               const courseItems = lecturesByCourse.get(course.id) ?? [];
+              const studiedCount = courseItems.filter((item) => item.completed).length;
+              const progress = courseItems.length
+                ? Math.round((studiedCount / courseItems.length) * 100)
+                : 0;
+              const dueCount = upcomingDeadlines.filter(
+                (deadline) => deadline.course_id === course.id,
+              ).length;
               const byDate = (items: typeof courseItems) =>
                 items
                   .slice()
@@ -1089,6 +1032,71 @@ function UniPage() {
                   items: byDate(courseItems.filter((l) => l.kind === "tutorial")),
                 },
               ];
+
+              if (!selectedCourse) {
+                const circumference = 113.1;
+                return (
+                  <button
+                    key={course.id}
+                    type="button"
+                    onClick={() => setSelectedCourseId(course.id)}
+                    className="group relative overflow-hidden rounded-xl border border-line bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-rust/40 hover:shadow-md"
+                  >
+                    <span
+                      className="absolute inset-x-0 top-0 h-1.5"
+                      style={{ backgroundColor: course.color ?? "#CE552F" }}
+                    />
+                    <span className="flex items-start justify-between gap-4 pt-1">
+                      <span className="min-w-0">
+                        <FolderClosed
+                          className="mb-4 size-6"
+                          style={{ color: course.color ?? "#CE552F" }}
+                        />
+                        <span className="block truncate font-display text-xl font-medium text-ink">
+                          {course.name}
+                        </span>
+                        <span className="mt-1 block truncate text-xs text-ink-soft">
+                          {course.code || `${courseItems.length} sessions`}
+                        </span>
+                      </span>
+                      <span className="relative mt-1 flex size-12 shrink-0 items-center justify-center">
+                        <svg viewBox="0 0 44 44" className="absolute inset-0 size-full -rotate-90">
+                          <circle
+                            cx="22"
+                            cy="22"
+                            r="18"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            className="text-line"
+                          />
+                          <circle
+                            cx="22"
+                            cy="22"
+                            r="18"
+                            fill="none"
+                            stroke={course.color ?? "#CE552F"}
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={circumference * (1 - progress / 100)}
+                          />
+                        </svg>
+                        <span className="text-[10px] font-semibold text-ink">{progress}%</span>
+                      </span>
+                    </span>
+                    <span className="mt-5 flex items-center justify-between gap-2 border-t border-line pt-3">
+                      <span className="text-xs text-ink-soft">
+                        {studiedCount} of {courseItems.length} studied
+                      </span>
+                      <span className="rounded-full bg-cream px-2.5 py-1 text-[11px] font-semibold text-ink">
+                        {dueCount} due
+                      </span>
+                    </span>
+                  </button>
+                );
+              }
+              if (selectedCourse.id !== course.id) return null;
 
               return (
                 <section
