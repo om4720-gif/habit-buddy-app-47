@@ -58,3 +58,34 @@ account. What Buddy is currently wearing and the chosen theme are kept in the br
 - **Calendar (.ics):** open deadlines as all-day events with a reminder the day before.
 - **Full backup (JSON):** every table in one file (course photo files themselves are not included).
 - **CSV:** habit history, courses and lectures, deadlines (UTF-8 with BOM so Excel shows Arabic correctly).
+
+## Security notes
+
+- **Every server function requires a signed-in user.** The only public door is the read-only feed
+  (`/api/public/claude`). It needs a 48-character secret token, has no wildcard CORS, rate-limits each caller,
+  and locks out callers that keep guessing tokens. Use **Reset link** on the University page to replace the token.
+  Prefer sending it as an `Authorization: Bearer <token>` header; `?key=` still works for tools that only take a link.
+- **AI features are limited per person** (voice, Mero chat, briefing) so one account can't burn your credits or
+  free quota. Limits are kept in each server instance's memory, so they stop bursts and runaway scripts but are
+  not a hard global quota. If the app is only for you, also turn off public sign-ups in your backend's auth settings.
+- **Text typed by users is treated as untrusted.** It is flattened and capped before it goes into an AI prompt,
+  one message can make at most 10 changes, and tool inputs are length- and format-checked.
+- **CSV exports** prefix cells that start with `=`, `+`, `-` or `@` so spreadsheets can't run them as formulas.
+
+## Exams
+
+On the University page, **Exams** shows one circle per upcoming exam with the days left inside (2, 1, then "Today").
+The ring fills as the day gets closer and turns red at 2 days or fewer. Tap a circle for details, edit or delete.
+The home page shows the same circles for exams in the next 30 days.
+
+- **Add exam** for one exam, or **Import timetable**: paste lines like `Steel Design 20/12/2026 09:00`
+  (English or Arabic dates, Arabic digits, 12/24-hour times are understood), or choose a photo or screenshot of the
+  timetable. Photo scanning uses the same `FALLBACK_AI_API_KEY` as voice and Mero, is limited to 4 scans a minute,
+  and always shows every row for review before anything is saved.
+- Exams are stored as ordinary deadlines (kind `quiz`) whose title starts with 🎓, so no database change is needed.
+  They also show up in reminders, the calendar export and the Claude feed.
+
+## Appearance
+
+Settings → **Appearance**: Light, Dark or System (follows the device, including when it switches at night).
+The choice is remembered per device. The accent color (Make it yours) has a brighter variant in dark mode.

@@ -1,10 +1,18 @@
 import { useEffect } from "react";
 
-import { applyTheme, useTheme } from "@/lib/customize";
+import { applyColorMode, applyTheme, useColorMode, useTheme } from "@/lib/customize";
 
-/** Keeps the app's accent color in sync with the chosen theme. Renders nothing. */
+/** Keeps light/dark mode and the accent color in sync with the saved choices. Renders nothing. */
 export function ThemeApplier() {
   const theme = useTheme();
-  useEffect(() => applyTheme(theme), [theme]);
+  const mode = useColorMode();
+  useEffect(() => {
+    const device = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => applyTheme(theme, applyColorMode(mode, device.matches));
+    apply();
+    if (mode !== "system") return;
+    device.addEventListener("change", apply); // follow the device when it switches at sunset
+    return () => device.removeEventListener("change", apply);
+  }, [theme, mode]);
   return null;
 }

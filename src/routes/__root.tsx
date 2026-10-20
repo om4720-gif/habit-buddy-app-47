@@ -81,16 +81,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Ritual — Daily Habit Tracker" },
-      { name: "description", content: "Track your daily habits, build streaks, and keep a quiet ledger of small wins." },
+      {
+        name: "description",
+        content: "Track your daily habits, build streaks, and keep a quiet ledger of small wins.",
+      },
       { name: "author", content: "Lovable" },
       { property: "og:title", content: "Ritual — Daily Habit Tracker" },
-      { property: "og:description", content: "Track your daily habits, build streaks, and keep a quiet ledger of small wins." },
+      {
+        property: "og:description",
+        content: "Track your daily habits, build streaks, and keep a quiet ledger of small wins.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
       { name: "theme-color", content: "#CE552F" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-title", content: "Ritual" },
+    ],
+    scripts: [
+      {
+        children: `(function(){try{var m=localStorage.getItem("ritual:mode");var d=m==="dark"||(m!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var r=document.documentElement;if(d)r.classList.add("dark");r.style.colorScheme=d?"dark":"light";}catch(e){}})();`,
+      },
     ],
     links: [
       {

@@ -29,14 +29,50 @@ export const FURS: FurDef[] = [
   { id: "olive", name: "Olive", color: "#5E8C3A", price: 350 },
 ];
 
-export type ThemeDef = { id: string; name: string; value: string | null; swatch: string };
+export type ThemeDef = {
+  id: string;
+  name: string;
+  value: string | null;
+  dark: string | null;
+  swatch: string;
+};
 export const THEMES: ThemeDef[] = [
-  { id: "rust", name: "Rust", value: null, swatch: "#C8502B" },
-  { id: "ocean", name: "Ocean", value: "oklch(0.52 0.12 245)", swatch: "#2F6F9F" },
-  { id: "forest", name: "Forest", value: "oklch(0.5 0.12 155)", swatch: "#2F7D5B" },
-  { id: "plum", name: "Plum", value: "oklch(0.5 0.15 310)", swatch: "#7E4FA0" },
-  { id: "rose", name: "Rose", value: "oklch(0.58 0.17 5)", swatch: "#C2547B" },
-  { id: "sun", name: "Sun", value: "oklch(0.62 0.15 70)", swatch: "#C9871F" },
+  { id: "rust", name: "Rust", value: null, dark: null, swatch: "#C8502B" },
+  {
+    id: "ocean",
+    name: "Ocean",
+    value: "oklch(0.52 0.12 245)",
+    dark: "oklch(0.74 0.11 245)",
+    swatch: "#2F6F9F",
+  },
+  {
+    id: "forest",
+    name: "Forest",
+    value: "oklch(0.5 0.12 155)",
+    dark: "oklch(0.74 0.13 155)",
+    swatch: "#2F7D5B",
+  },
+  {
+    id: "plum",
+    name: "Plum",
+    value: "oklch(0.5 0.15 310)",
+    dark: "oklch(0.76 0.12 310)",
+    swatch: "#7E4FA0",
+  },
+  {
+    id: "rose",
+    name: "Rose",
+    value: "oklch(0.55 0.17 5)",
+    dark: "oklch(0.76 0.13 8)",
+    swatch: "#B04068",
+  },
+  {
+    id: "sun",
+    name: "Sun",
+    value: "oklch(0.54 0.12 70)",
+    dark: "oklch(0.8 0.14 78)",
+    swatch: "#9A6A12",
+  },
 ];
 
 export type Outfit = { head: string | null; face: string | null; neck: string | null; fur: string };
@@ -100,7 +136,8 @@ const subscribe = (cb: () => void) => {
   };
 };
 
-export const useOutfit = (): Outfit => useSyncExternalStore(subscribe, outfitSnapshot, () => NO_OUTFIT);
+export const useOutfit = (): Outfit =>
+  useSyncExternalStore(subscribe, outfitSnapshot, () => NO_OUTFIT);
 
 export function setOutfit(patch: Partial<Outfit>) {
   writeRaw(OUTFIT_KEY, JSON.stringify({ ...outfitSnapshot(), ...patch }));
@@ -113,12 +150,40 @@ const themeSnapshot = () => {
 export const useTheme = (): string => useSyncExternalStore(subscribe, themeSnapshot, () => "rust");
 export const setTheme = (id: string) => writeRaw(THEME_KEY, id);
 
-/** Applies the accent color to the whole app (Buddy's classic fur follows it too). */
-export function applyTheme(id: string) {
-  const value = THEMES.find((t) => t.id === id)?.value ?? null;
+/** Applies the accent color to the whole app, buttons included (Buddy's classic fur follows it too). */
+export function applyTheme(id: string, dark = false) {
+  const t = THEMES.find((x) => x.id === id);
+  const value = (dark ? t?.dark : t?.value) ?? null;
   const root = document.documentElement;
-  if (value) root.style.setProperty("--rust", value);
-  else root.style.removeProperty("--rust");
+  for (const name of ["--rust", "--primary", "--ring"]) {
+    if (value) root.style.setProperty(name, value);
+    else root.style.removeProperty(name); // back to the palette's own accent
+  }
+}
+
+// ---- Light / Dark / follow the device ----
+export type ColorMode = "light" | "dark" | "system";
+const MODE_KEY = "ritual:mode";
+const modeSnapshot = (): ColorMode => {
+  const v = readRaw(MODE_KEY);
+  return v === "light" || v === "dark" ? v : "system";
+};
+export const useColorMode = (): ColorMode =>
+  useSyncExternalStore(subscribe, modeSnapshot, () => "system" as ColorMode);
+export const setColorMode = (mode: ColorMode) => writeRaw(MODE_KEY, mode);
+export const resolveDark = (mode: ColorMode, deviceIsDark: boolean) =>
+  mode === "dark" || (mode === "system" && deviceIsDark);
+
+/** Puts the "dark" class on <html> (and tells the browser, so form fields and scrollbars match). Returns whether it is dark. */
+export function applyColorMode(mode: ColorMode, deviceIsDark: boolean): boolean {
+  const dark = resolveDark(mode, deviceIsDark);
+  const root = document.documentElement;
+  root.classList.toggle("dark", dark);
+  root.style.colorScheme = dark ? "dark" : "light";
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", dark ? "#1a1612" : "#CE552F");
+  return dark;
 }
 
 // ---- has the person looked at "Make it yours" yet? (drives the "New" nudge) ----
@@ -130,7 +195,8 @@ const seenSnapshot = () => {
     return true; // can't remember it, so don't nag
   }
 };
-export const useYoursSeen = (): boolean => useSyncExternalStore(subscribe, seenSnapshot, () => true);
+export const useYoursSeen = (): boolean =>
+  useSyncExternalStore(subscribe, seenSnapshot, () => true);
 export const markYoursSeen = () => writeRaw(SEEN_KEY, "1");
 
 // ---- ownership: a paid item is stored as a redemption titled "Buddy item: <id>" ----
@@ -138,4 +204,6 @@ export const PURCHASE_PREFIX = "Buddy item: ";
 export const purchaseTitle = (id: string) => `${PURCHASE_PREFIX}${id}`;
 export const isPurchase = (title: string) => title.startsWith(PURCHASE_PREFIX);
 export const ownedFrom = (history: { title: string }[]) =>
-  new Set(history.filter((h) => isPurchase(h.title)).map((h) => h.title.slice(PURCHASE_PREFIX.length)));
+  new Set(
+    history.filter((h) => isPurchase(h.title)).map((h) => h.title.slice(PURCHASE_PREFIX.length)),
+  );

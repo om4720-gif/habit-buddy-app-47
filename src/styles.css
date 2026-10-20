@@ -88,7 +88,7 @@
   --primary-foreground: oklch(0.985 0.008 85);
   --secondary: oklch(0.93 0.018 80);
   --secondary-foreground: oklch(0.22 0.02 70);
-  --muted: oklch(0.90 0.02 80);
+  --muted: oklch(0.9 0.02 80);
   --muted-foreground: oklch(0.48 0.025 70);
   --accent: oklch(0.93 0.018 80);
   --accent-foreground: oklch(0.22 0.02 70);
@@ -103,7 +103,7 @@
   --ink: oklch(0.22 0.02 70);
   --ink-soft: oklch(0.48 0.025 70);
   --rust: oklch(0.58 0.18 35);
-  --sand: oklch(0.90 0.02 80);
+  --sand: oklch(0.9 0.02 80);
   --line: oklch(0.86 0.018 80);
 
   --chart-1: oklch(0.646 0.222 41.116);
@@ -119,6 +119,46 @@
   --sidebar-accent-foreground: oklch(0.22 0.02 70);
   --sidebar-border: oklch(0.86 0.018 80);
   --sidebar-ring: oklch(0.58 0.18 35);
+}
+
+/* Dark mode: same tokens, warm dark surfaces. Applied when <html> has the "dark" class. */
+.dark {
+  --background: oklch(0.19 0.012 70);
+  --foreground: oklch(0.93 0.012 85);
+  --card: oklch(0.245 0.014 70);
+  --card-foreground: oklch(0.93 0.012 85);
+  --popover: oklch(0.245 0.014 70);
+  --popover-foreground: oklch(0.93 0.012 85);
+  --primary: oklch(0.7 0.15 38);
+  --primary-foreground: oklch(0.19 0.012 70);
+  --secondary: oklch(0.29 0.015 70);
+  --secondary-foreground: oklch(0.93 0.012 85);
+  --muted: oklch(0.3 0.015 70);
+  --muted-foreground: oklch(0.74 0.02 80);
+  --accent: oklch(0.29 0.015 70);
+  --accent-foreground: oklch(0.93 0.012 85);
+  --destructive: oklch(0.7 0.19 25);
+  --destructive-foreground: oklch(0.19 0.012 70);
+  --border: oklch(0.35 0.016 70);
+  --input: oklch(0.35 0.016 70);
+  --ring: oklch(0.7 0.15 38);
+
+  --paper: oklch(0.21 0.012 70);
+  --cream: oklch(0.245 0.014 70);
+  --ink: oklch(0.93 0.012 85);
+  --ink-soft: oklch(0.74 0.02 80);
+  --rust: oklch(0.7 0.15 38);
+  --sand: oklch(0.31 0.016 70);
+  --line: oklch(0.35 0.016 70);
+
+  --sidebar: oklch(0.245 0.014 70);
+  --sidebar-foreground: oklch(0.93 0.012 85);
+  --sidebar-primary: oklch(0.7 0.15 38);
+  --sidebar-primary-foreground: oklch(0.19 0.012 70);
+  --sidebar-accent: oklch(0.29 0.015 70);
+  --sidebar-accent-foreground: oklch(0.93 0.012 85);
+  --sidebar-border: oklch(0.35 0.016 70);
+  --sidebar-ring: oklch(0.7 0.15 38);
 }
 
 @layer base {
@@ -167,36 +207,186 @@
 }
 
 @keyframes rise {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 @utility animate-rise {
   animation: rise 0.5s ease-out both;
 }
 
-
 /* ---- Buddy mascot ---- */
-@keyframes buddyBob { 0%,100% { transform: translateY(0) scale(1,1); } 50% { transform: translateY(-2px) scale(1.012,.985); } }
-@keyframes buddyParty { 0%,100% { transform: translateY(0) scale(1,1); } 35% { transform: translateY(-9px) scale(.97,1.04); } 60% { transform: translateY(0) scale(1.04,.96); } }
-@keyframes buddyHop { 0% { transform: translateY(0) scale(1.08,.9); } 30% { transform: translateY(-24px) scale(.95,1.08); } 55% { transform: translateY(0) scale(1.1,.88); } 75% { transform: translateY(-7px) scale(1); } 100% { transform: translateY(0) scale(1,1); } }
-@keyframes buddyBlink { 0%,92%,100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
-@keyframes buddyWingIdle { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(5deg); } }
-@keyframes buddyWingUp { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-28deg); } }
-@keyframes buddyWave { 0%,100% { transform: rotate(0deg); } 25% { transform: rotate(-40deg); } 50% { transform: rotate(-8deg); } 75% { transform: rotate(-40deg); } }
-@keyframes buddyConfetti { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(80px) rotate(420deg); opacity: 0; } }
-@keyframes buddyThink { 0%,80%,100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
-@keyframes buddyTwinkle { 0%,100% { opacity: 0; transform: scale(.4); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes buddyBob {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.012, 0.985);
+  }
+}
+@keyframes buddyParty {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  35% {
+    transform: translateY(-9px) scale(0.97, 1.04);
+  }
+  60% {
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+}
+@keyframes buddyHop {
+  0% {
+    transform: translateY(0) scale(1.08, 0.9);
+  }
+  30% {
+    transform: translateY(-24px) scale(0.95, 1.08);
+  }
+  55% {
+    transform: translateY(0) scale(1.1, 0.88);
+  }
+  75% {
+    transform: translateY(-7px) scale(1);
+  }
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+@keyframes buddyBlink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes buddyWingIdle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+@keyframes buddyWingUp {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-28deg);
+  }
+}
+@keyframes buddyWave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-40deg);
+  }
+  50% {
+    transform: rotate(-8deg);
+  }
+  75% {
+    transform: rotate(-40deg);
+  }
+}
+@keyframes buddyConfetti {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(80px) rotate(420deg);
+    opacity: 0;
+  }
+}
+@keyframes buddyThink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@keyframes buddyTwinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
 
 @media (prefers-reduced-motion: no-preference) {
-  .buddy-bob { animation: buddyBob 3.2s ease-in-out infinite; transform-origin: 50px 92px; }
-  .buddy-party { animation: buddyParty 1s ease-in-out infinite; transform-origin: 50px 92px; }
-  .buddy-hop { animation: buddyHop .95s cubic-bezier(.3,.7,.4,1) 1; transform-origin: 50px 92px; }
-  .buddy-blink { animation: buddyBlink 4.6s infinite; transform-box: fill-box; transform-origin: center; }
-  .buddy-wing-l, .buddy-wing-r { animation: buddyWingIdle 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 15%; }
-  .buddy-wing-up-l, .buddy-wing-up-r { animation: buddyWingUp .5s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 85%; }
-  .buddy-wing-up-r { animation-direction: reverse; }
-  .buddy-wave { animation: buddyWave 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 85%; }
-  .buddy-confetti { animation: buddyConfetti 1.1s ease-out both; transform-box: fill-box; transform-origin: center; }
-  .buddy-think-dot { animation: buddyThink 1.1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-  .buddy-twinkle { animation: buddyTwinkle 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .buddy-bob {
+    animation: buddyBob 3.2s ease-in-out infinite;
+    transform-origin: 50px 92px;
+  }
+  .buddy-party {
+    animation: buddyParty 1s ease-in-out infinite;
+    transform-origin: 50px 92px;
+  }
+  .buddy-hop {
+    animation: buddyHop 0.95s cubic-bezier(0.3, 0.7, 0.4, 1) 1;
+    transform-origin: 50px 92px;
+  }
+  .buddy-blink {
+    animation: buddyBlink 4.6s infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .buddy-wing-l,
+  .buddy-wing-r {
+    animation: buddyWingIdle 3.2s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: 50% 15%;
+  }
+  .buddy-wing-up-l,
+  .buddy-wing-up-r {
+    animation: buddyWingUp 0.5s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: 50% 85%;
+  }
+  .buddy-wing-up-r {
+    animation-direction: reverse;
+  }
+  .buddy-wave {
+    animation: buddyWave 1.8s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: 50% 85%;
+  }
+  .buddy-confetti {
+    animation: buddyConfetti 1.1s ease-out both;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .buddy-think-dot {
+    animation: buddyThink 1.1s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .buddy-twinkle {
+    animation: buddyTwinkle 2s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
 }
