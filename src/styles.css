@@ -121,44 +121,76 @@
   --sidebar-ring: oklch(0.58 0.18 35);
 }
 
-/* Dark mode: same tokens, warm dark surfaces. Applied when <html> has the "dark" class. */
+/* Midnight teal surfaces with warm, softened text and copper accents. */
 .dark {
-  --background: oklch(0.19 0.012 70);
-  --foreground: oklch(0.93 0.012 85);
-  --card: oklch(0.245 0.014 70);
-  --card-foreground: oklch(0.93 0.012 85);
-  --popover: oklch(0.245 0.014 70);
-  --popover-foreground: oklch(0.93 0.012 85);
-  --primary: oklch(0.7 0.15 38);
-  --primary-foreground: oklch(0.19 0.012 70);
-  --secondary: oklch(0.29 0.015 70);
-  --secondary-foreground: oklch(0.93 0.012 85);
-  --muted: oklch(0.3 0.015 70);
-  --muted-foreground: oklch(0.74 0.02 80);
-  --accent: oklch(0.29 0.015 70);
-  --accent-foreground: oklch(0.93 0.012 85);
-  --destructive: oklch(0.7 0.19 25);
-  --destructive-foreground: oklch(0.19 0.012 70);
-  --border: oklch(0.35 0.016 70);
-  --input: oklch(0.35 0.016 70);
-  --ring: oklch(0.7 0.15 38);
+  --background: oklch(0.22 0.025 220);
+  --foreground: oklch(0.87 0.018 80);
+  --card: oklch(0.285 0.025 220);
+  --card-foreground: oklch(0.87 0.018 80);
+  --popover: oklch(0.285 0.025 220);
+  --popover-foreground: oklch(0.87 0.018 80);
+  --primary: oklch(0.7 0.13 38);
+  --primary-foreground: oklch(0.22 0.025 220);
+  --secondary: oklch(0.33 0.025 220);
+  --secondary-foreground: oklch(0.87 0.018 80);
+  --muted: oklch(0.33 0.025 220);
+  --muted-foreground: oklch(0.7 0.025 220);
+  --accent: oklch(0.33 0.025 220);
+  --accent-foreground: oklch(0.87 0.018 80);
+  --destructive: oklch(0.68 0.16 25);
+  --destructive-foreground: oklch(0.22 0.025 220);
+  --border: oklch(0.38 0.025 220);
+  --input: oklch(0.38 0.025 220);
+  --ring: oklch(0.7 0.13 38);
 
-  --paper: oklch(0.21 0.012 70);
-  --cream: oklch(0.245 0.014 70);
-  --ink: oklch(0.93 0.012 85);
-  --ink-soft: oklch(0.74 0.02 80);
-  --rust: oklch(0.7 0.15 38);
-  --sand: oklch(0.31 0.016 70);
-  --line: oklch(0.35 0.016 70);
+  --paper: oklch(0.22 0.025 220);
+  --cream: oklch(0.285 0.025 220);
+  --ink: oklch(0.87 0.018 80);
+  --ink-soft: oklch(0.7 0.025 220);
+  --rust: oklch(0.7 0.13 38);
+  --sand: oklch(0.35 0.025 220);
+  --line: oklch(0.38 0.025 220);
 
-  --sidebar: oklch(0.245 0.014 70);
-  --sidebar-foreground: oklch(0.93 0.012 85);
-  --sidebar-primary: oklch(0.7 0.15 38);
-  --sidebar-primary-foreground: oklch(0.19 0.012 70);
-  --sidebar-accent: oklch(0.29 0.015 70);
-  --sidebar-accent-foreground: oklch(0.93 0.012 85);
-  --sidebar-border: oklch(0.35 0.016 70);
-  --sidebar-ring: oklch(0.7 0.15 38);
+  --sidebar: oklch(0.285 0.025 220);
+  --sidebar-foreground: oklch(0.87 0.018 80);
+  --sidebar-primary: oklch(0.7 0.13 38);
+  --sidebar-primary-foreground: oklch(0.22 0.025 220);
+  --sidebar-accent: oklch(0.33 0.025 220);
+  --sidebar-accent-foreground: oklch(0.87 0.018 80);
+  --sidebar-border: oklch(0.38 0.025 220);
+  --sidebar-ring: oklch(0.7 0.13 38);
+}
+
+.dark [data-course-color="0"] {
+  --course-accent: oklch(0.72 0.12 165);
+}
+
+.dark [data-course-color="1"] {
+  --course-accent: oklch(0.75 0.11 300);
+}
+
+.dark [data-course-color="2"] {
+  --course-accent: oklch(0.78 0.13 80);
+}
+
+.dark [data-course-color="3"] {
+  --course-accent: oklch(0.72 0.12 230);
+}
+
+.dark [data-course-color="4"] {
+  --course-accent: oklch(0.72 0.12 10);
+}
+
+.dark [data-course-color="5"] {
+  --course-accent: oklch(0.76 0.12 130);
+}
+
+.dark [data-course-color] {
+  border-color: color-mix(in oklab, var(--course-accent) 35%, var(--border));
+}
+
+.dark button[data-course-color] {
+  background-color: color-mix(in oklab, var(--card) 94%, var(--course-accent));
 }
 
 @layer base {

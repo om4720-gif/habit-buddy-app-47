@@ -998,7 +998,7 @@ function UniPage() {
           </div>
         ) : (
           <div className={selectedCourse ? "" : "grid gap-4 sm:grid-cols-2"}>
-            {courses.map((course) => {
+            {courses.map((course, courseIndex) => {
               const courseItems = lecturesByCourse.get(course.id) ?? [];
               const studiedCount = courseItems.filter((item) => item.completed).length;
               const progress = courseItems.length
@@ -1041,16 +1041,22 @@ function UniPage() {
                     type="button"
                     onClick={() => setSelectedCourseId(course.id)}
                     className="group relative overflow-hidden rounded-xl border border-line bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-rust/40 hover:shadow-md"
+                    data-course-color={courseIndex % 6}
                   >
                     <span
                       className="absolute inset-x-0 top-0 h-1.5"
-                      style={{ backgroundColor: course.color ?? "#CE552F" }}
+                      style={{
+                        backgroundColor:
+                          "var(--course-accent, " + (course.color ?? "#CE552F") + ")",
+                      }}
                     />
                     <span className="flex items-start justify-between gap-4 pt-1">
                       <span className="min-w-0">
                         <FolderClosed
                           className="mb-4 size-6"
-                          style={{ color: course.color ?? "#CE552F" }}
+                          style={{
+                            color: "var(--course-accent, " + (course.color ?? "#CE552F") + ")",
+                          }}
                         />
                         <span className="block truncate font-display text-xl font-medium text-ink">
                           {course.name}
@@ -1075,7 +1081,7 @@ function UniPage() {
                             cy="22"
                             r="18"
                             fill="none"
-                            stroke={course.color ?? "#CE552F"}
+                            stroke={`var(--course-accent, ${course.color ?? "#CE552F"})`}
                             strokeWidth="3"
                             strokeLinecap="round"
                             strokeDasharray={circumference}
@@ -1102,12 +1108,15 @@ function UniPage() {
                 <section
                   key={course.id}
                   className="rounded-2xl border border-line bg-card shadow-sm"
+                  data-course-color={courseIndex % 6}
                 >
                   <div className="flex items-center justify-between border-b border-line px-5 py-4">
                     <div className="flex items-center gap-3">
                       <span
                         className="inline-block size-3 rounded-full"
-                        style={{ backgroundColor: course.color ?? "#CE552F" }}
+                        style={{
+                          backgroundColor: `var(--course-accent, ${course.color ?? "#CE552F"})`,
+                        }}
                       />
                       <div>
                         <h2 className="font-display text-lg font-medium text-ink">{course.name}</h2>
