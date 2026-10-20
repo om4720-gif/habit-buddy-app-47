@@ -121,76 +121,86 @@
   --sidebar-ring: oklch(0.58 0.18 35);
 }
 
-/* Midnight teal surfaces with warm, softened text and copper accents. */
+/* Charcoal surfaces, coral actions, and vivid course colors for dark mode. */
 .dark {
-  --background: oklch(0.22 0.025 220);
-  --foreground: oklch(0.87 0.018 80);
-  --card: oklch(0.285 0.025 220);
-  --card-foreground: oklch(0.87 0.018 80);
-  --popover: oklch(0.285 0.025 220);
-  --popover-foreground: oklch(0.87 0.018 80);
-  --primary: oklch(0.7 0.13 38);
-  --primary-foreground: oklch(0.22 0.025 220);
-  --secondary: oklch(0.33 0.025 220);
-  --secondary-foreground: oklch(0.87 0.018 80);
-  --muted: oklch(0.33 0.025 220);
-  --muted-foreground: oklch(0.7 0.025 220);
-  --accent: oklch(0.33 0.025 220);
-  --accent-foreground: oklch(0.87 0.018 80);
+  --background: oklch(0.17 0.004 260);
+  --foreground: oklch(0.94 0.008 80);
+  --card: oklch(0.235 0.006 260);
+  --card-foreground: oklch(0.94 0.008 80);
+  --popover: oklch(0.25 0.006 260);
+  --popover-foreground: oklch(0.94 0.008 80);
+  --primary: oklch(0.72 0.16 30);
+  --primary-foreground: oklch(0.17 0.004 260);
+  --secondary: oklch(0.29 0.007 260);
+  --secondary-foreground: oklch(0.94 0.008 80);
+  --muted: oklch(0.29 0.007 260);
+  --muted-foreground: oklch(0.72 0.01 260);
+  --accent: oklch(0.32 0.008 260);
+  --accent-foreground: oklch(0.94 0.008 80);
   --destructive: oklch(0.68 0.16 25);
-  --destructive-foreground: oklch(0.22 0.025 220);
-  --border: oklch(0.38 0.025 220);
-  --input: oklch(0.38 0.025 220);
-  --ring: oklch(0.7 0.13 38);
+  --destructive-foreground: oklch(0.17 0.004 260);
+  --border: oklch(0.34 0.007 260);
+  --input: oklch(0.34 0.007 260);
+  --ring: oklch(0.72 0.16 30);
 
-  --paper: oklch(0.22 0.025 220);
-  --cream: oklch(0.285 0.025 220);
-  --ink: oklch(0.87 0.018 80);
-  --ink-soft: oklch(0.7 0.025 220);
-  --rust: oklch(0.7 0.13 38);
-  --sand: oklch(0.35 0.025 220);
-  --line: oklch(0.38 0.025 220);
+  --paper: oklch(0.17 0.004 260);
+  --cream: oklch(0.25 0.006 260);
+  --ink: oklch(0.94 0.008 80);
+  --ink-soft: oklch(0.72 0.01 260);
+  --rust: oklch(0.72 0.16 30);
+  --sand: oklch(0.32 0.008 260);
+  --line: oklch(0.34 0.007 260);
 
-  --sidebar: oklch(0.285 0.025 220);
-  --sidebar-foreground: oklch(0.87 0.018 80);
-  --sidebar-primary: oklch(0.7 0.13 38);
-  --sidebar-primary-foreground: oklch(0.22 0.025 220);
-  --sidebar-accent: oklch(0.33 0.025 220);
-  --sidebar-accent-foreground: oklch(0.87 0.018 80);
-  --sidebar-border: oklch(0.38 0.025 220);
-  --sidebar-ring: oklch(0.7 0.13 38);
+  --sidebar: oklch(0.21 0.005 260);
+  --sidebar-foreground: oklch(0.94 0.008 80);
+  --sidebar-primary: oklch(0.72 0.16 30);
+  --sidebar-primary-foreground: oklch(0.17 0.004 260);
+  --sidebar-accent: oklch(0.29 0.007 260);
+  --sidebar-accent-foreground: oklch(0.94 0.008 80);
+  --sidebar-border: oklch(0.34 0.007 260);
+  --sidebar-ring: oklch(0.72 0.16 30);
 }
 
 .dark [data-course-color="0"] {
-  --course-accent: oklch(0.72 0.12 165);
+  --course-accent: oklch(0.68 0.18 35);
+  --course-surface: oklch(0.31 0.085 35);
 }
 
 .dark [data-course-color="1"] {
-  --course-accent: oklch(0.75 0.11 300);
+  --course-accent: oklch(0.72 0.14 175);
+  --course-surface: oklch(0.3 0.07 175);
 }
 
 .dark [data-course-color="2"] {
-  --course-accent: oklch(0.78 0.13 80);
+  --course-accent: oklch(0.72 0.17 295);
+  --course-surface: oklch(0.3 0.08 295);
 }
 
 .dark [data-course-color="3"] {
-  --course-accent: oklch(0.72 0.12 230);
+  --course-accent: oklch(0.78 0.15 85);
+  --course-surface: oklch(0.32 0.09 85);
 }
 
 .dark [data-course-color="4"] {
-  --course-accent: oklch(0.72 0.12 10);
+  --course-accent: oklch(0.72 0.15 250);
+  --course-surface: oklch(0.3 0.08 250);
 }
 
 .dark [data-course-color="5"] {
-  --course-accent: oklch(0.76 0.12 130);
+  --course-accent: oklch(0.72 0.16 350);
+  --course-surface: oklch(0.31 0.09 350);
 }
 
 .dark [data-course-color] {
-  border-color: color-mix(in oklab, var(--course-accent) 35%, var(--border));
+  border-color: color-mix(in oklab, var(--course-accent) 40%, var(--border));
 }
 
 .dark button[data-course-color] {
-  background-color: color-mix(in oklab, var(--card) 94%, var(--course-accent));
+  background-color: var(--course-surface);
+}
+
+.dark section[data-course-color] {
+  background-color: color-mix(in oklab, var(--card) 55%, var(--course-surface));
 }
 
 @layer base {

@@ -182,7 +182,7 @@ export function applyColorMode(mode: ColorMode, deviceIsDark: boolean): boolean 
   root.style.colorScheme = dark ? "dark" : "light";
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", dark ? "#263333" : "#CE552F");
+    ?.setAttribute("content", dark ? "#17181b" : "#CE552F");
   return dark;
 }
 
