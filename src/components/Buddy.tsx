@@ -56,8 +56,19 @@ function Accessories({ outfit }: { outfit: Outfit }) {
           <ellipse cx="38" cy="51" rx="12.5" ry="9.5" fill={INK} opacity="0.93" />
           <ellipse cx="62" cy="51" rx="12.5" ry="9.5" fill={INK} opacity="0.93" />
           <path d="M49 49 L51 49" stroke={INK} strokeWidth="3" />
-          <path d="M25.5 49 L19 46 M74.5 49 L81 46" stroke={INK} strokeWidth="2.4" strokeLinecap="round" />
-          <path d="M31 47 L36 44 M55 47 L60 44" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.55" />
+          <path
+            d="M25.5 49 L19 46 M74.5 49 L81 46"
+            stroke={INK}
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M31 47 L36 44 M55 47 L60 44"
+            stroke="#fff"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            opacity="0.55"
+          />
         </g>
       )}
 
@@ -65,7 +76,13 @@ function Accessories({ outfit }: { outfit: Outfit }) {
         <g>
           <path d="M38 30 L38 37 Q50 43 62 37 L62 30 Z" fill="#2B2118" />
           <polygon points="16,26 50,11 84,26 50,40" fill="#3A2E24" />
-          <path d="M50 26 L78 29 L78 41" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" />
+          <path
+            d="M50 26 L78 29 L78 41"
+            fill="none"
+            stroke={GOLD}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
           <circle cx="78" cy="42" r="2.6" fill={GOLD} />
         </g>
       )}
@@ -79,7 +96,13 @@ function Accessories({ outfit }: { outfit: Outfit }) {
       )}
       {outfit.head === "crown" && (
         <g>
-          <path d="M33 32 L35 12 L43 22 L50 8 L57 22 L65 12 L67 32 Z" fill={GOLD} stroke="#B8861B" strokeWidth="1.5" strokeLinejoin="round" />
+          <path
+            d="M33 32 L35 12 L43 22 L50 8 L57 22 L65 12 L67 32 Z"
+            fill={GOLD}
+            stroke="#B8861B"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
           <rect x="33" y="27" width="34" height="5" fill="#E0A126" />
           <circle cx="35" cy="11" r="2.4" fill="#C2547B" />
           <circle cx="50" cy="7" r="2.6" fill="#4A6FA5" />
@@ -88,7 +111,13 @@ function Accessories({ outfit }: { outfit: Outfit }) {
       )}
       {outfit.head === "headphones" && (
         <g>
-          <path d="M20 54 Q20 12 50 12 Q80 12 80 54" fill="none" stroke={INK} strokeWidth="4.5" strokeLinecap="round" />
+          <path
+            d="M20 54 Q20 12 50 12 Q80 12 80 54"
+            fill="none"
+            stroke={INK}
+            strokeWidth="4.5"
+            strokeLinecap="round"
+          />
           <rect x="12" y="46" width="12" height="22" rx="6" fill="#3A2E24" />
           <rect x="76" y="46" width="12" height="22" rx="6" fill="#3A2E24" />
           <rect x="15" y="50" width="6" height="14" rx="3" style={{ fill: "var(--rust)" }} />
@@ -153,11 +182,17 @@ export function BuddyFace({
   const wingFill = `color-mix(in oklab, ${bodyFill} 78%, black)`;
   const party = mood === "party";
   const bodyClass = confetti ? "buddy-hop" : party ? "buddy-party" : "buddy-bob";
-  const confettiColors = ["var(--rust)", GOLD, "var(--ink-soft)", CHEEK];
+  const confettiColors = ["var(--rust)", GOLD, "#9A8B7A", CHEEK];
 
   return (
-    <svg ref={svgRef} viewBox="0 0 100 100" overflow="visible" className={className} aria-hidden="true">
-      <ellipse cx="50" cy="96" rx="24" ry="4" style={{ fill: "var(--ink)" }} opacity="0.12" />
+    <svg
+      ref={svgRef}
+      viewBox="0 0 100 100"
+      overflow="visible"
+      className={className}
+      aria-hidden="true"
+    >
+      <ellipse cx="50" cy="96" rx="24" ry="4" fill="#000" opacity="0.15" />
 
       <g className={bodyClass}>
         {/* feet */}
@@ -166,20 +201,38 @@ export function BuddyFace({
 
         {/* wings */}
         <g className={party || joy ? "buddy-wing-up-l" : "buddy-wing-l"}>
-          <ellipse cx="17" cy="62" rx="8" ry="15" transform="rotate(-14 17 62)" style={{ fill: wingFill }} />
+          <ellipse
+            cx="17"
+            cy="62"
+            rx="8"
+            ry="15"
+            transform="rotate(-14 17 62)"
+            style={{ fill: wingFill }}
+          />
         </g>
-        <g className={party || joy ? "buddy-wing-up-r" : mood === "wave" ? "buddy-wave" : "buddy-wing-r"}>
-          <ellipse cx="83" cy="62" rx="8" ry="15" transform="rotate(14 83 62)" style={{ fill: wingFill }} />
+        <g
+          className={
+            party || joy ? "buddy-wing-up-r" : mood === "wave" ? "buddy-wave" : "buddy-wing-r"
+          }
+        >
+          <ellipse
+            cx="83"
+            cy="62"
+            rx="8"
+            ry="15"
+            transform="rotate(14 83 62)"
+            style={{ fill: wingFill }}
+          />
         </g>
 
         {/* body, belly, tuft */}
         <ellipse cx="50" cy="58" rx="34" ry="34" style={{ fill: bodyFill }} />
-        <ellipse cx="50" cy="68" rx="21" ry="20" style={{ fill: "var(--cream)" }} />
+        <ellipse cx="50" cy="68" rx="21" ry="20" fill="#FBF7EF" />
         <path d="M42 27 Q43 14 49 24 Q52 11 57 24 Q60 16 62 28 Z" style={{ fill: bodyFill }} />
 
         {/* eyes */}
         {joy || party ? (
-          <g fill="none" strokeWidth="3.2" strokeLinecap="round" style={{ stroke: "var(--ink)" }}>
+          <g fill="none" strokeWidth="3.2" strokeLinecap="round" stroke={INK}>
             <path d="M29 52 Q38 40 47 52" />
             <path d="M53 52 Q62 40 71 52" />
           </g>
@@ -188,8 +241,8 @@ export function BuddyFace({
             <circle cx="38" cy="50" r="10" fill="#fff" />
             <circle cx="62" cy="50" r="10" fill="#fff" />
             <g ref={pupilsRef} style={{ transition: "transform .12s ease-out" }}>
-              <circle cx="38" cy="50" r="5" style={{ fill: "var(--ink)" }} />
-              <circle cx="62" cy="50" r="5" style={{ fill: "var(--ink)" }} />
+              <circle cx="38" cy="50" r="5" fill={INK} />
+              <circle cx="62" cy="50" r="5" fill={INK} />
               <circle cx="40" cy="48" r="1.6" fill="#fff" />
               <circle cx="64" cy="48" r="1.6" fill="#fff" />
             </g>
@@ -198,13 +251,19 @@ export function BuddyFace({
 
         {/* mood details: raised brows when ready, a little smile when happy */}
         {mood === "ready" && !joy && (
-          <g strokeWidth="2.6" strokeLinecap="round" style={{ stroke: "var(--ink)" }}>
+          <g strokeWidth="2.6" strokeLinecap="round" stroke={INK}>
             <path d="M31 34 Q38 27 45 34" fill="none" />
             <path d="M55 34 Q62 27 69 34" fill="none" />
           </g>
         )}
         {mood === "happy" && !joy && (
-          <path d="M43 72 Q50 79 57 72" fill="none" strokeWidth="2.2" strokeLinecap="round" style={{ stroke: "var(--ink)" }} />
+          <path
+            d="M43 72 Q50 79 57 72"
+            fill="none"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            stroke={INK}
+          />
         )}
 
         {/* cheeks */}
@@ -214,7 +273,7 @@ export function BuddyFace({
         {/* beak / mouth */}
         {joy || party ? (
           <g>
-            <path d="M41 62 Q50 80 59 62 Z" style={{ fill: "var(--ink)" }} />
+            <path d="M41 62 Q50 80 59 62 Z" fill={INK} />
             <path d="M45 71 Q50 76 55 71 Q50 68 45 71 Z" fill={CHEEK} />
           </g>
         ) : (
@@ -225,18 +284,31 @@ export function BuddyFace({
       </g>
 
       {mood === "think" && !joy && (
-        <g style={{ fill: "var(--ink-soft)" }}>
+        <g fill="#9A8B7A">
           {[34, 50, 66].map((x, i) => (
-            <circle key={x} cx={x} cy={8 - (i === 1 ? 4 : 0)} r="3.2" className="buddy-think-dot" style={{ animationDelay: `${i * 0.18}s` }} />
+            <circle
+              key={x}
+              cx={x}
+              cy={8 - (i === 1 ? 4 : 0)}
+              r="3.2"
+              className="buddy-think-dot"
+              style={{ animationDelay: `${i * 0.18}s` }}
+            />
           ))}
         </g>
       )}
 
       {party && !confetti && (
         <g fill={GOLD} fontSize="11">
-          <text x="6" y="26" className="buddy-twinkle">✦</text>
-          <text x="86" y="30" className="buddy-twinkle" style={{ animationDelay: "0.5s" }}>✦</text>
-          <text x="78" y="8" className="buddy-twinkle" style={{ animationDelay: "1s" }}>✦</text>
+          <text x="6" y="26" className="buddy-twinkle">
+            ✦
+          </text>
+          <text x="86" y="30" className="buddy-twinkle" style={{ animationDelay: "0.5s" }}>
+            ✦
+          </text>
+          <text x="78" y="8" className="buddy-twinkle" style={{ animationDelay: "1s" }}>
+            ✦
+          </text>
         </g>
       )}
 
@@ -250,14 +322,25 @@ export function BuddyFace({
             height="7"
             rx="1"
             className="buddy-confetti"
-            style={{ fill: confettiColors[i % confettiColors.length], animationDelay: `${i * 50}ms` }}
+            style={{
+              fill: confettiColors[i % confettiColors.length],
+              animationDelay: `${i * 50}ms`,
+            }}
           />
         ))}
     </svg>
   );
 }
 
-export function Buddy({ mood, completed, total }: { mood: BuddyMood; completed: number; total: number }) {
+export function Buddy({
+  mood,
+  completed,
+  total,
+}: {
+  mood: BuddyMood;
+  completed: number;
+  total: number;
+}) {
   const [hop, setHop] = useState(false);
   const [bubble, setBubble] = useState<string | null>(null);
   const { svgRef, pupilsRef } = usePupilFollow();
@@ -281,10 +364,11 @@ export function Buddy({ mood, completed, total }: { mood: BuddyMood; completed: 
   useEffect(() => {
     if (total === 0) return;
     if (prevCompleted.current !== null && completed > prevCompleted.current) {
-      celebrate(completed === total ? ["All done! Go claim a reward ✦", "Perfect day! 🎉"] : CHEER_LINES);
+      celebrate(
+        completed === total ? ["All done! Go claim a reward ✦", "Perfect day! 🎉"] : CHEER_LINES,
+      );
     }
     prevCompleted.current = completed;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completed, total]);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);

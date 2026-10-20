@@ -3,7 +3,9 @@
 export type Row = Record<string, unknown>;
 
 const cell = (v: unknown) => {
-  const s = v === null || v === undefined ? "" : String(v);
+  let s = v === null || v === undefined ? "" : String(v);
+  // Spreadsheets run text that starts with = + - @ as a formula (CSV injection): force it to plain text.
+  if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
@@ -36,12 +38,27 @@ function nextDay(isoDate: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-export type IcsDeadline = { id: string; title: string; kind: string; due_date: string; course: string };
+export type IcsDeadline = {
+  id: string;
+  title: string;
+  kind: string;
+  due_date: string;
+  course: string;
+};
 
 /** All-day events with a reminder the day before. */
 export function buildIcs(deadlines: IcsDeadline[], now = new Date()): string {
-  const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Ritual//Deadlines//EN", "CALSCALE:GREGORIAN", "X-WR-CALNAME:Ritual deadlines"];
+  const stamp = now
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Ritual//Deadlines//EN",
+    "CALSCALE:GREGORIAN",
+    "X-WR-CALNAME:Ritual deadlines",
+  ];
   for (const d of deadlines) {
     if (!/^\d{4}-\d{2}-\d{2}/.test(d.due_date)) continue;
     const day = d.due_date.slice(0, 10);
@@ -65,6 +82,14 @@ export function buildIcs(deadlines: IcsDeadline[], now = new Date()): string {
   return lines.map(fold).join("\r\n") + "\r\n";
 }
 
-export function buildBackupJson(tables: Record<string, Row[]>, errors: Record<string, string>, now = new Date()): string {
-  return JSON.stringify({ app: "Ritual", exportedAt: now.toISOString(), version: 1, tables, errors }, null, 2);
+export function buildBackupJson(
+  tables: Record<string, Row[]>,
+  errors: Record<string, string>,
+  now = new Date(),
+): string {
+  return JSON.stringify(
+    { app: "Ritual", exportedAt: now.toISOString(), version: 1, tables, errors },
+    null,
+    2,
+  );
 }

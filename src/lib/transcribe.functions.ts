@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getFallbackAI } from "@/lib/ai-fallback.server";
+import { DAY, MINUTE, limitUser } from "@/lib/rate-limit.server";
 
 const PROMPT =
   "Transcribe this audio exactly as spoken. The speaker may use Egyptian Arabic, English, or a mix of both. " +
@@ -20,11 +21,20 @@ export const transcribeAudio = createServerFn({ method: "POST" })
     z
       .object({
         // ~28M base64 chars is about 20 MB of audio; reject bigger payloads early.
-        audioBase64: z.string().min(100).max(28_000_000),
+        audioBase64: z
+          .string()
+          .min(100)
+          .max(28_000_000)
+          .refine((v) => /^[A-Za-z0-9+/]{100}/.test(v), "That doesn't look like audio."),
       })
-      .parse(data)
+      .parse(data),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    // Every recording is a paid or quota-limited AI call: limit it per person.
+    limitUser(context.userId, "voice", [
+      { limit: 10, windowMs: MINUTE, label: "voice" },
+      { limit: 150, windowMs: DAY, label: "daily voice" },
+    ]);
     const fb = getFallbackAI();
     if (!fb) throw new Error("Cloud voice isn't set up. Add the FALLBACK_AI_API_KEY secret.");
 
@@ -50,7 +60,9 @@ export const transcribeAudio = createServerFn({ method: "POST" })
       console.error(`Transcription failed [${res.status}]: ${body.slice(0, 500)}`);
       if (res.status === 429) throw new Error("Too many voice requests. Try again in a minute.");
       if (res.status === 400 || res.status === 404)
-        throw new Error("The voice model rejected the request. Check FALLBACK_AI_MODEL in your secrets.");
+        throw new Error(
+          "The voice model rejected the request. Check FALLBACK_AI_MODEL in your secrets.",
+        );
       if (res.status === 401 || res.status === 403)
         throw new Error("The voice key was refused. Check FALLBACK_AI_API_KEY in your secrets.");
       throw new Error("Could not understand that recording.");

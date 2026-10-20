@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Buddy, type BuddyMood } from "@/components/Buddy";
+import { ExamStrip } from "@/components/ExamStrip";
 import { HabitTracker } from "@/components/HabitTracker";
 import { habitColor } from "@/lib/habitColors";
 import { markYoursSeen, useYoursSeen } from "@/lib/customize";
@@ -111,13 +112,16 @@ function DashboardPage() {
           onAdd={() => setIsAdding(true)}
         />
 
+        <ExamStrip />
+
         {!yoursSeen && (
           <div className="mt-4 flex items-center gap-3 rounded-2xl bg-cream px-4 py-3 ring-1 ring-black/5">
             <span className="text-lg" aria-hidden="true">
               🎨
             </span>
             <p className="min-w-0 flex-1 text-sm text-ink">
-              <span className="font-semibold">New:</span> dress up Buddy and recolor the app with your points.
+              <span className="font-semibold">New:</span> dress up Buddy and recolor the app with
+              your points.
             </p>
             <button
               onClick={() => setRewardsOpen("buddy")}
@@ -197,7 +201,9 @@ function DashboardPage() {
         />
       )}
 
-      {rewardsOpen && <RewardsDialog initialTab={rewardsOpen} onClose={() => setRewardsOpen(null)} />}
+      {rewardsOpen && (
+        <RewardsDialog initialTab={rewardsOpen} onClose={() => setRewardsOpen(null)} />
+      )}
     </div>
   );
 }
@@ -251,13 +257,14 @@ function Header({
           <PointsChip balance={balance} onClick={onOpenRewards} />
           <button
             onClick={onOpenCustomize}
-            className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-sm font-medium text-ink-soft transition hover:bg-sand hover:text-ink"
-            aria-label="Style your buddy"
-            title="Style your buddy"
+            className="relative grid size-9 place-items-center rounded-full text-ink-soft transition hover:bg-sand hover:text-ink"
+            aria-label="Make it yours: dress up Buddy and change colors"
+            title="Make it yours"
           >
             <Palette className="size-[18px]" />
-            <span className="hidden whitespace-nowrap sm:inline">Style your buddy</span>
-            {showNew && <span className="absolute left-5 top-1 size-2.5 rounded-full bg-rust ring-2 ring-background" />}
+            {showNew && (
+              <span className="absolute right-1 top-1 size-2.5 rounded-full bg-rust ring-2 ring-background" />
+            )}
           </button>
           <button
             onClick={onToggleSound}
@@ -511,8 +518,12 @@ function StatsRow({
     <div className="mt-6 grid grid-cols-3 divide-x divide-line border-t border-line pt-5">
       {stats.map((stat) => (
         <div key={stat.label} title={stat.title} className="px-3 first:pl-0 last:pr-0">
-          <p className="font-display text-2xl font-semibold tabular-nums">{statsPending ? "—" : stat.value}</p>
-          <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-ink-soft">{stat.label}</p>
+          <p className="font-display text-2xl font-semibold tabular-nums">
+            {statsPending ? "—" : stat.value}
+          </p>
+          <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-ink-soft">
+            {stat.label}
+          </p>
         </div>
       ))}
     </div>
