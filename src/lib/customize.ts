@@ -42,35 +42,35 @@ export const THEMES: ThemeDef[] = [
     id: "ocean",
     name: "Ocean",
     value: "oklch(0.52 0.12 245)",
-    dark: "oklch(0.74 0.11 245)",
+    dark: "oklch(0.69 0.1 245)",
     swatch: "#2F6F9F",
   },
   {
     id: "forest",
     name: "Forest",
     value: "oklch(0.5 0.12 155)",
-    dark: "oklch(0.74 0.13 155)",
+    dark: "oklch(0.69 0.11 155)",
     swatch: "#2F7D5B",
   },
   {
     id: "plum",
     name: "Plum",
     value: "oklch(0.5 0.15 310)",
-    dark: "oklch(0.76 0.12 310)",
+    dark: "oklch(0.7 0.11 310)",
     swatch: "#7E4FA0",
   },
   {
     id: "rose",
     name: "Rose",
     value: "oklch(0.55 0.17 5)",
-    dark: "oklch(0.76 0.13 8)",
+    dark: "oklch(0.7 0.12 8)",
     swatch: "#B04068",
   },
   {
     id: "sun",
     name: "Sun",
     value: "oklch(0.54 0.12 70)",
-    dark: "oklch(0.8 0.14 78)",
+    dark: "oklch(0.73 0.12 78)",
     swatch: "#9A6A12",
   },
 ];
@@ -182,7 +182,7 @@ export function applyColorMode(mode: ColorMode, deviceIsDark: boolean): boolean 
   root.style.colorScheme = dark ? "dark" : "light";
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", dark ? "#1a1612" : "#CE552F");
+    ?.setAttribute("content", dark ? "#263333" : "#CE552F");
   return dark;
 }
 
