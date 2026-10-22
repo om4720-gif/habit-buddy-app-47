@@ -1,36 +1,56 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  createGradeItem,
-  deleteGradeItem,
-  dismissGradeNotifications,
-  getCourseGradeSettings,
-  getGradeInboxToken,
-  getGradeItems,
-  getUnreadGradeNotifications,
-  resetGradeInboxToken,
-  saveCourseGradeSettings,
-  updateGradeItem,
-} from "@/lib/grades.functions";
-
 type Course = { id: string; name: string; code: string | null; color: string | null };
-type GradeItem = Awaited<ReturnType<typeof getGradeItems>>[number];
+type GradeItem = {
+  id: string;
+  course_id: string;
+  title: string;
+  score: number | null;
+  max_score: number;
+  weight: number;
+  is_final: boolean;
+  marks?: GradeMark[];
+  best_count?: number | null;
+  expected_count?: number | null;
+};
+type GradeMark = {
+  id: string;
+  name: string;
+  score: number | null;
+  max_score: number;
+  counts_for?: string;
+};
+type CourseGradeSettings = {
+  course_id: string;
+  credit_hours: number;
+  grade_cutoffs: Record<string, { minimum: number; gpaStart: number; gpaEnd: number }>;
+};
 type GradeForm = {
   title: string;
   score: string;
   maxScore: string;
   weight: string;
   isFinal: boolean;
+  bestCount: string;
+  expectedCount: string;
+  marks: { id: string; name: string; score: string; maxScore: string; countsFor: string }[];
 };
 type GradeCutoff = { label: string; minimum: string; gpaStart: string; gpaEnd: string };
 
-const emptyForm: GradeForm = { title: "", score: "", maxScore: "100", weight: "", isFinal: false };
+const emptyForm: GradeForm = {
+  title: "",
+  score: "",
+  maxScore: "100",
+  weight: "",
+  isFinal: false,
+  bestCount: "",
+  expectedCount: "",
+  marks: [],
+};
 const defaultCutoffs: GradeCutoff[] = [
   { label: "A+", minimum: "94", gpaStart: "0.99", gpaEnd: "0.7" },
   { label: "A", minimum: "90", gpaStart: "1.29", gpaEnd: "1.0" },
@@ -47,6 +67,29 @@ const defaultCutoffs: GradeCutoff[] = [
 ];
 const percent = (value: number) => `${Number.isInteger(value) ? value : value.toFixed(1)}%`;
 type GradeBand = { label: string; minimum: number; gpaStart: number; gpaEnd: number };
+
+function itemProgress(item: GradeItem) {
+  if (item.score !== null) {
+    const ratio = item.max_score > 0 ? item.score / item.max_score : 0;
+    return { markedWeight: item.weight, earnedWeight: item.weight * ratio, ratio };
+  }
+
+  const marks = (item.marks ?? []).filter(
+    (mark) => mark.score !== null && mark.counts_for !== "exclude" && mark.max_score > 0,
+  );
+  if (marks.length === 0) return { markedWeight: 0, earnedWeight: 0, ratio: null };
+
+  const bestCount = Math.max(1, item.best_count ?? item.expected_count ?? marks.length);
+  const selected = marks
+    .slice()
+    .sort((a, b) => (b.score ?? 0) / b.max_score - (a.score ?? 0) / a.max_score)
+    .slice(0, bestCount);
+  const coverage = Math.min(1, selected.length / bestCount);
+  const ratio =
+    selected.reduce((sum, mark) => sum + (mark.score ?? 0) / mark.max_score, 0) / selected.length;
+  const markedWeight = item.weight * coverage;
+  return { markedWeight, earnedWeight: markedWeight * ratio, ratio };
+}
 
 function gpaForGrade(average: number, bands: GradeBand[]) {
   const index = bands.findIndex((band) => average >= band.minimum);
@@ -83,14 +126,25 @@ function readCutoffs(value: unknown): GradeCutoff[] {
   return rows.length ? rows : defaultCutoffs;
 }
 
+const LOCAL_GRADES_KEY = "habit-buddy:course-grades:v1";
+
+function readLocalGrades(): { items: GradeItem[]; settings: CourseGradeSettings[] } {
+  try {
+    const raw = localStorage.getItem(LOCAL_GRADES_KEY);
+    if (!raw) return { items: [], settings: [] };
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return { items: [], settings: [] };
+    const data = parsed as { items?: unknown; settings?: unknown };
+    return {
+      items: Array.isArray(data.items) ? (data.items as GradeItem[]) : [],
+      settings: Array.isArray(data.settings) ? (data.settings as CourseGradeSettings[]) : [],
+    };
+  } catch {
+    return { items: [], settings: [] };
+  }
+}
+
 export function GradesSection({ courses }: { courses: Course[] }) {
-  const queryClient = useQueryClient();
-  const fetchGradeItems = useServerFn(getGradeItems);
-  const fetchSettings = useServerFn(getCourseGradeSettings);
-  const createItem = useServerFn(createGradeItem);
-  const updateItem = useServerFn(updateGradeItem);
-  const deleteItem = useServerFn(deleteGradeItem);
-  const saveSettings = useServerFn(saveCourseGradeSettings);
   const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id ?? "");
   const [schemeOpen, setSchemeOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -98,15 +152,49 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   const [form, setForm] = useState<GradeForm>(emptyForm);
   const [cutoffForm, setCutoffForm] = useState<GradeCutoff[]>(defaultCutoffs);
   const [creditHours, setCreditHours] = useState("3");
+  const [gradeItems, setGradeItems] = useState<GradeItem[]>([]);
+  const [gradeSettings, setGradeSettings] = useState<CourseGradeSettings[]>([]);
 
-  const { data: gradeItems = [] } = useQuery({
-    queryKey: ["grade-items"],
-    queryFn: () => fetchGradeItems({ data: {} }),
-  });
-  const { data: gradeSettings = [] } = useQuery({
-    queryKey: ["course-grade-settings"],
-    queryFn: () => fetchSettings({ data: {} }),
-  });
+  useEffect(() => {
+    const saved = readLocalGrades();
+    setGradeItems(saved.items);
+    setGradeSettings(saved.settings);
+  }, []);
+
+  function persistLocalGrades(items: GradeItem[], settings: CourseGradeSettings[]) {
+    localStorage.setItem(LOCAL_GRADES_KEY, JSON.stringify({ items, settings }));
+    setGradeItems(items);
+    setGradeSettings(settings);
+  }
+
+  function updateGradeSettings(
+    courseId: string,
+    update: Partial<Omit<CourseGradeSettings, "course_id">>,
+  ) {
+    const existing = gradeSettings.find((setting) => setting.course_id === courseId);
+    const next: CourseGradeSettings = {
+      course_id: courseId,
+      credit_hours: existing?.credit_hours ?? 3,
+      grade_cutoffs:
+        existing?.grade_cutoffs ??
+        Object.fromEntries(
+          defaultCutoffs.map((item) => [
+            item.label,
+            {
+              minimum: Number(item.minimum),
+              gpaStart: Number(item.gpaStart),
+              gpaEnd: Number(item.gpaEnd),
+            },
+          ]),
+        ),
+      ...update,
+    };
+    persistLocalGrades(gradeItems, [
+      ...gradeSettings.filter((setting) => setting.course_id !== courseId),
+      next,
+    ]);
+  }
+
   useEffect(() => {
     if (!courses.some((course) => course.id === selectedCourseId))
       setSelectedCourseId(courses[0]?.id ?? "");
@@ -118,57 +206,18 @@ export function GradesSection({ courses }: { courses: Course[] }) {
     setCreditHours(String(currentSettings?.credit_hours ?? 3));
   }, [gradeSettings, selectedCourseId]);
 
-  const course = courses.find((item) => item.id === selectedCourseId);
+  const selectedCourse = courses.find((item) => item.id === selectedCourseId);
   const courseGradeItems = gradeItems.filter((item) => item.course_id === selectedCourseId);
-  const orderedItems = useMemo(
-    () => courseGradeItems.slice().sort((a, b) => Number(b.is_final) - Number(a.is_final)),
-    [courseGradeItems],
-  );
+  const orderedItems = courseGradeItems
+    .slice()
+    .sort((a, b) => Number(b.is_final) - Number(a.is_final));
   const totalWeight = courseGradeItems.reduce((sum, item) => sum + item.weight, 0);
-  const markedWeight = courseGradeItems.reduce(
-    (sum, item) => sum + (item.score === null ? 0 : item.weight),
-    0,
-  );
-  const earnedWeightedPoints = courseGradeItems.reduce(
-    (sum, item) => sum + (item.score === null ? 0 : (item.score / item.max_score) * item.weight),
-    0,
-  );
-  const currentAverage = markedWeight > 0 ? (earnedWeightedPoints / markedWeight) * 100 : null;
-  const finalItem = courseGradeItems.find((item) => item.is_final);
-  const remainingWeight = courseGradeItems.reduce(
-    (sum, item) => sum + (item.score === null ? item.weight : 0),
-    0,
-  );
-  const sortedCutoffs = cutoffForm
-    .map(({ label, minimum, gpaStart, gpaEnd }) => ({
-      label,
-      minimum: Number(minimum),
-      gpaStart: Number(gpaStart),
-      gpaEnd: Number(gpaEnd),
-    }))
-    .filter(
-      ({ label, minimum, gpaStart, gpaEnd }) =>
-        label.trim() &&
-        Number.isFinite(minimum) &&
-        minimum >= 0 &&
-        minimum <= 100 &&
-        Number.isFinite(gpaStart) &&
-        Number.isFinite(gpaEnd),
-    )
-    .sort((a, b) => b.minimum - a.minimum);
-  const currentLetterGrade =
-    currentAverage === null
-      ? null
-      : (sortedCutoffs.find(({ minimum }) => currentAverage >= minimum)?.label ?? "Below scale");
 
   const courseSummaries = courses.map((item) => {
     const items = gradeItems.filter((grade) => grade.course_id === item.id);
-    const marked = items.filter((grade) => grade.score !== null);
-    const weight = marked.reduce((sum, grade) => sum + grade.weight, 0);
-    const earned = marked.reduce(
-      (sum, grade) => sum + ((grade.score ?? 0) / grade.max_score) * grade.weight,
-      0,
-    );
+    const progress = items.map(itemProgress);
+    const weight = progress.reduce((sum, grade) => sum + grade.markedWeight, 0);
+    const earned = progress.reduce((sum, grade) => sum + grade.earnedWeight, 0);
     const average = weight > 0 ? (earned / weight) * 100 : null;
     const settings = gradeSettings.find((setting) => setting.course_id === item.id);
     const bands = readCutoffs(settings?.grade_cutoffs)
@@ -197,18 +246,20 @@ export function GradesSection({ courses }: { courses: Course[] }) {
     0,
   );
 
-  function neededOnRemaining(minimum: number) {
-    if (remainingWeight <= 0) return null;
-    return ((minimum - earnedWeightedPoints) / remainingWeight) * 100;
+  function neededOnRemaining(minimum: number, earned: number, remaining: number) {
+    if (remaining <= 0) return null;
+    return ((minimum - earned) / remaining) * 100;
   }
 
   function openNewItem() {
+    setSchemeOpen(false);
     setEditingItem(null);
     setForm(emptyForm);
     setFormOpen(true);
   }
 
   function openEditItem(item: GradeItem) {
+    setSchemeOpen(false);
     setEditingItem(item);
     setForm({
       title: item.title,
@@ -216,6 +267,15 @@ export function GradesSection({ courses }: { courses: Course[] }) {
       maxScore: String(item.max_score),
       weight: String(item.weight),
       isFinal: item.is_final,
+      bestCount: item.best_count ? String(item.best_count) : "",
+      expectedCount: item.expected_count ? String(item.expected_count) : "",
+      marks: (item.marks ?? []).map((mark) => ({
+        id: mark.id,
+        name: mark.name,
+        score: mark.score === null ? "" : String(mark.score),
+        maxScore: String(mark.max_score),
+        countsFor: mark.counts_for ?? "here",
+      })),
     });
     setFormOpen(true);
   }
@@ -223,18 +283,121 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   async function handleSaveItem(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedCourseId) return;
-    const data = {
-      courseId: selectedCourseId,
-      title: form.title.trim(),
-      score: form.score === "" ? null : Number(form.score),
-      maxScore: Number(form.maxScore),
-      weight: Number(form.weight),
-      isFinal: form.isFinal,
-    };
+    const title = form.title.trim();
+    const score = form.score === "" ? null : Number(form.score);
+    const maxScore = Number(form.maxScore);
+    const weight = Number(form.weight);
+    const bestCount = form.bestCount === "" ? null : Number(form.bestCount);
+    const expectedCount = form.expectedCount === "" ? null : Number(form.expectedCount);
+    const marks: GradeMark[] = form.marks.map((mark) => ({
+      id: mark.id,
+      name: mark.name.trim() || "Mark",
+      score: mark.score === "" ? null : Number(mark.score),
+      max_score: Number(mark.maxScore),
+      counts_for: mark.countsFor,
+    }));
+    const courseItems = gradeItems.filter((item) => item.course_id === selectedCourseId);
     try {
-      if (editingItem) await updateItem({ data: { ...data, gradeItemId: editingItem.id } });
-      else await createItem({ data });
-      await queryClient.invalidateQueries({ queryKey: ["grade-items"] });
+      if (!title || !Number.isFinite(weight) || weight <= 0 || weight > 100)
+        throw new Error("Enter an assessment name and a weight from 0.1% to 100%.");
+      if (score !== null && (!Number.isFinite(maxScore) || maxScore <= 0))
+        throw new Error("Maximum score must be greater than 0.");
+      if (score !== null && (!Number.isFinite(score) || score < 0 || score > maxScore))
+        throw new Error("Score must be between 0 and the maximum score.");
+      if (
+        form.marks.some((mark) => {
+          const markScore = mark.score === "" ? null : Number(mark.score);
+          const markMax = Number(mark.maxScore);
+          return (
+            !Number.isFinite(markMax) ||
+            markMax <= 0 ||
+            (markScore !== null &&
+              (!Number.isFinite(markScore) || markScore < 0 || markScore > markMax))
+          );
+        })
+      )
+        throw new Error("Each mark must be between 0 and its maximum score.");
+      if (bestCount !== null && (!Number.isInteger(bestCount) || bestCount < 1))
+        throw new Error("Counts the best must be a whole number greater than zero.");
+      if (
+        expectedCount !== null &&
+        (!Number.isInteger(expectedCount) ||
+          expectedCount < 1 ||
+          (bestCount !== null && expectedCount < bestCount))
+      )
+        throw new Error("Out of how many must be at least the best count.");
+      if (
+        courseItems.some(
+          (item) => item.id !== editingItem?.id && item.title.toLowerCase() === title.toLowerCase(),
+        )
+      )
+        throw new Error("This assessment already exists in the grading scheme.");
+      if (form.isFinal && courseItems.some((item) => item.id !== editingItem?.id && item.is_final))
+        throw new Error("This course already has a final exam component.");
+      const otherWeight = courseItems
+        .filter((item) => item.id !== editingItem?.id)
+        .reduce((sum, item) => sum + item.weight, 0);
+      if (otherWeight + weight > 100.0001)
+        throw new Error("Course grade weights cannot add up to more than 100%.");
+
+      const item: GradeItem = {
+        id: editingItem?.id ?? crypto.randomUUID(),
+        course_id: selectedCourseId,
+        title,
+        score,
+        max_score: score === null ? maxScore || 100 : maxScore,
+        weight,
+        is_final: form.isFinal,
+        marks: marks.filter((mark) => mark.counts_for === "here" || mark.counts_for === "exclude"),
+        best_count: bestCount,
+        expected_count: expectedCount,
+      };
+      const movedMarks = marks.filter(
+        (mark) => mark.counts_for !== "here" && mark.counts_for !== "exclude",
+      );
+      const movedItems = new Map<string, GradeItem>();
+      for (const mark of movedMarks) {
+        const destination = courseItems.find((candidate) => candidate.id === mark.counts_for);
+        if (!destination) throw new Error("Choose a valid assessment for each moved mark.");
+        const current = movedItems.get(destination.id) ?? destination;
+        const destinationMarks = current.marks ?? [];
+        const oldTotal: GradeMark[] =
+          current.score === null
+            ? []
+            : [
+                {
+                  id: crypto.randomUUID(),
+                  name: current.title,
+                  score: current.score,
+                  max_score: current.max_score,
+                },
+              ];
+        movedItems.set(destination.id, {
+          ...current,
+          score: null,
+          marks: [
+            ...destinationMarks,
+            ...oldTotal,
+            {
+              id: mark.id,
+              name: mark.name,
+              score: mark.score,
+              max_score: mark.max_score,
+              counts_for: "here",
+            },
+          ],
+        });
+      }
+      persistLocalGrades(
+        [
+          ...gradeItems.filter(
+            (existing) => existing.id !== item.id && !movedItems.has(existing.id),
+          ),
+          item,
+          ...movedItems.values(),
+        ],
+        gradeSettings,
+      );
       setFormOpen(false);
       toast.success(editingItem ? "Grading component updated" : "Grading component added");
     } catch (error) {
@@ -245,8 +408,10 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   async function handleDeleteItem(item: GradeItem) {
     if (!window.confirm(`Remove ${item.title} from this course grading scheme?`)) return;
     try {
-      await deleteItem({ data: { gradeItemId: item.id } });
-      await queryClient.invalidateQueries({ queryKey: ["grade-items"] });
+      persistLocalGrades(
+        gradeItems.filter((grade) => grade.id !== item.id),
+        gradeSettings,
+      );
       toast.success("Grading component removed");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not remove the component");
@@ -283,33 +448,19 @@ export function GradesSection({ courses }: { courses: Course[] }) {
       }
       cutoffs[normalizedLabel] = { minimum: value, gpaStart: start, gpaEnd: end };
     }
+    const parsedCreditHours = Number(creditHours);
+    if (!Number.isFinite(parsedCreditHours) || parsedCreditHours <= 0 || parsedCreditHours > 30) {
+      toast.error("Credit hours must be more than 0 and no more than 30.");
+      return;
+    }
     try {
-      await saveSettings({
-        data: {
-          courseId: selectedCourseId,
-          creditHours: Number(creditHours),
-          gradeCutoffs: cutoffs,
-        },
+      updateGradeSettings(selectedCourseId, {
+        credit_hours: parsedCreditHours,
+        grade_cutoffs: cutoffs,
       });
-      await queryClient.invalidateQueries({ queryKey: ["course-grade-settings"] });
       toast.success("Grading cutoffs saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save grade cutoffs");
-    }
-  }
-
-  async function copyInboxLink(reset = false) {
-    try {
-      const { token } = reset ? await resetGradeInboxToken() : await getGradeInboxToken();
-      const url = `${window.location.origin}/api/public/grades?key=${token}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success(reset ? "New grade inbox link copied" : "Grade inbox link copied");
-      } catch {
-        toast.message(url);
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not create the grade inbox link");
     }
   }
 
@@ -321,29 +472,6 @@ export function GradesSection({ courses }: { courses: Course[] }) {
             Course grades
           </p>
           <h2 className="mt-1 font-display text-2xl font-medium text-ink">Grades</h2>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="rounded-full border-line bg-card text-ink"
-            onClick={() => void copyInboxLink()}
-          >
-            Copy inbox link
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="rounded-full text-ink-soft"
-            onClick={() => {
-              if (window.confirm("Reset this grade inbox link? The old link will stop working."))
-                void copyInboxLink(true);
-            }}
-          >
-            Reset link
-          </Button>
         </div>
       </div>
 
@@ -359,21 +487,34 @@ export function GradesSection({ courses }: { courses: Course[] }) {
             <p className="mt-1 text-xs text-white/90">
               {courses.length} courses · {totalCredits} credit hours
               {gpaCourses.length
-                ? ` · ${Math.min(...defaultCutoffs.map((item) => Number(item.gpaEnd))).toFixed(1)} is the best`
+                ? ` · ${Math.min(...gpaCourses.map((item) => item.gpaPoints ?? 5)).toFixed(1)} is the best`
                 : ""}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-line bg-card px-4 py-3 text-xs leading-relaxed text-ink-soft">
-        The private inbox accepts grade updates from an authorized GUC integration. It never asks
-        for your GUC password. Checks are limited to 3 per rolling 24 hours; resetting the link does
-        not reset this limit. Send a JSON POST with the course code and exact assessment names from
-        the grading scheme, for example:
-        <pre className="mt-2 overflow-x-auto rounded-lg bg-cream p-3 text-[11px] text-ink">
-          {`{"course_code":"CIW 501","grades":[{"title":"Final exam","score":87,"max_score":100}]}`}
-        </pre>
+      <div className="rounded-2xl border border-line bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-ink">Get grades from GUC</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+              Sign in on GUC’s website. Habit Buddy does not collect or save your GUC password;
+              enter your grades here manually for now.
+            </p>
+          </div>
+          <a
+            href="https://apps.guc.edu.eg/student_ext/Grade/CheckGrade_01.aspx"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full bg-rust px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rust/90"
+          >
+            Open GUC Grades
+          </a>
+        </div>
+        <p className="mt-3 border-t border-line pt-3 text-xs leading-relaxed text-ink-soft">
+          Your grade tracker is saved in this browser and is not synced to other devices.
+        </p>
       </div>
 
       {courses.length === 0 ? (
@@ -381,145 +522,198 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           <p className="mt-2 text-sm text-ink-soft">Add a course before setting up its grades.</p>
         </div>
       ) : (
-        <>
-          <label className="block max-w-sm text-sm font-medium text-ink">
-            Course
-            <select
-              value={selectedCourseId}
-              onChange={(event) => setSelectedCourseId(event.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-line bg-card px-3 py-2 text-sm text-ink"
-            >
-              {courses.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                  {item.code ? ` · ${item.code}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="space-y-4">
+          {courses.map((course) => {
+            const items = gradeItems
+              .filter((grade) => grade.course_id === course.id)
+              .sort((a, b) => Number(b.is_final) - Number(a.is_final));
+            const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+            const itemProgressRows = items.map(itemProgress);
+            const markedWeight = itemProgressRows.reduce((sum, item) => sum + item.markedWeight, 0);
+            const earned = itemProgressRows.reduce((sum, item) => sum + item.earnedWeight, 0);
+            const average = markedWeight > 0 ? (earned / markedWeight) * 100 : null;
+            const remaining = Math.max(0, totalWeight - markedWeight);
+            const settings = gradeSettings.find((setting) => setting.course_id === course.id);
+            const bands = readCutoffs(settings?.grade_cutoffs)
+              .map((cutoff) => ({
+                ...cutoff,
+                minimum: Number(cutoff.minimum),
+                gpaStart: Number(cutoff.gpaStart),
+                gpaEnd: Number(cutoff.gpaEnd),
+              }))
+              .sort((a, b) => b.minimum - a.minimum);
+            const letter =
+              average === null
+                ? null
+                : (bands.find((band) => average >= band.minimum)?.label ?? "Below scale");
+            const points = average === null ? null : gpaForGrade(average, bands);
+            const final = items.some((item) => item.is_final);
 
-          {course && (
-            <article className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
-              <div className="p-5 sm:p-6">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-soft">
-                      {course.code || "Course"}
-                    </p>
-                    <h3 className="mt-1 font-display text-xl font-medium text-ink">
-                      {course.name}
-                    </h3>
+            return (
+              <article
+                key={course.id}
+                className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm"
+              >
+                <div className="p-4 sm:p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <button
+                      type="button"
+                      className="min-w-0 text-left"
+                      onClick={() => {
+                        setSelectedCourseId(course.id);
+                        setSchemeOpen(true);
+                      }}
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-soft">
+                        {course.code || "Course"} · {settings?.credit_hours ?? 3} CH
+                      </p>
+                      <h3 className="mt-0.5 font-display text-lg font-semibold text-ink">
+                        {course.name}
+                      </h3>
+                    </button>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-ink">
+                          {average === null ? "—" : percent(average)}
+                        </p>
+                        {letter && (
+                          <p className="text-xs font-semibold text-ink-soft">
+                            {letter} · {points?.toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-ink-soft"
+                        onClick={() => {
+                          setSelectedCourseId(course.id);
+                          setSchemeOpen(true);
+                        }}
+                      >
+                        Grading scheme
+                      </Button>
+                    </div>
                   </div>
+
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream">
+                    <div
+                      className="h-full rounded-full bg-rust transition-all"
+                      style={{ width: `${Math.min(100, markedWeight)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-ink-soft">
+                    {percent(markedWeight)} of the grade marked
+                  </p>
+
+                  <div className="mt-3 rounded-xl bg-cream p-3">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="text-xs font-semibold uppercase text-ink-soft">
+                        Coursework
+                      </span>
+                      <span className="text-sm font-bold text-ink">
+                        {percent(earned)} / {percent(totalWeight)}
+                      </span>
+                      {markedWeight > 0 && (
+                        <span className="text-sm font-semibold text-ink">
+                          {percent(average ?? 0)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-ink-soft">
+                      {average === null
+                        ? "No grades marked yet"
+                        : `Average ${percent(average)} on the ${percent(markedWeight)} marked so far`}
+                    </p>
+                  </div>
+
+                  {final && remaining > 0 && (
+                    <div className="mt-3">
+                      <div className="flex flex-wrap gap-2">
+                        {bands.slice(0, 3).map(({ label, minimum }) => {
+                          const needed = neededOnRemaining(minimum, earned, remaining);
+                          const value =
+                            needed === null
+                              ? "—"
+                              : needed <= 0
+                                ? "Already there"
+                                : needed > 100
+                                  ? "Over 100%"
+                                  : `needs ${percent(needed)}`;
+                          return (
+                            <span
+                              key={label}
+                              className="rounded-full bg-cream px-3 py-1 text-xs font-semibold text-ink"
+                            >
+                              {label} {value}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-1.5 text-xs text-ink-soft">
+                        average in the {percent(remaining)} still to come
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mt-3 divide-y divide-line">
+                    {items.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCourseId(course.id);
+                          openEditItem(item);
+                        }}
+                        className="flex w-full items-center justify-between gap-3 py-2 text-left"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-ink">
+                            {item.title}
+                          </span>
+                          <span className="block text-xs text-ink-soft">
+                            {percent(item.weight)} of the grade
+                            {item.best_count
+                              ? ` · best ${item.best_count}${item.expected_count ? ` of ${item.expected_count}` : ""}`
+                              : ""}
+                            {item.marks?.length
+                              ? ` · ${item.marks.filter((mark) => mark.score !== null && mark.counts_for !== "exclude").length} mark${item.marks.filter((mark) => mark.score !== null && mark.counts_for !== "exclude").length === 1 ? "" : "s"}`
+                              : item.score !== null
+                                ? ` · ${item.score}/${item.max_score}`
+                                : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right text-sm font-semibold text-ink-soft">
+                          {itemProgress(item).ratio === null
+                            ? "Not marked"
+                            : item.best_count
+                              ? `${percent((itemProgress(item).ratio ?? 0) * 100)}${itemProgress(item).markedWeight < item.weight ? " so far" : ""}`
+                              : item.score !== null
+                                ? `${item.score}/${item.max_score}`
+                                : percent((itemProgress(item).ratio ?? 0) * 100)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="rounded-full border-line bg-background text-ink"
-                    onClick={() => setSchemeOpen(true)}
+                    className="mt-3 w-full rounded-full border-line bg-background text-ink"
+                    onClick={() => {
+                      setSelectedCourseId(course.id);
+                      openNewItem();
+                    }}
                   >
-                    Grading scheme
+                    + Add assessment
                   </Button>
                 </div>
-
-                <div className="mt-5 rounded-2xl bg-violet-600 px-5 py-4 text-white shadow-md">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-3xl font-bold">
-                        {currentAverage === null ? "—" : percent(currentAverage)}
-                      </p>
-                      <p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-white/80">
-                        Average on marked work
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      {currentLetterGrade && (
-                        <p className="text-2xl font-bold">
-                          {currentLetterGrade}
-                          {sortedCutoffs.find((item) => item.label === currentLetterGrade)
-                            ? ` · ${gpaForGrade(currentAverage ?? 0, sortedCutoffs)?.toFixed(2)}`
-                            : ""}
-                        </p>
-                      )}
-                      <p className="text-xs text-white/85">
-                        {percent(markedWeight)} of course marked
-                      </p>
-                      <p className="text-xs text-white/85">{percent(totalWeight)} weighted</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/20">
-                    <div
-                      className="h-full rounded-full bg-orange-400 transition-all"
-                      style={{ width: `${Math.min(100, markedWeight)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-xl bg-cream p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                    {remainingWeight > 0 ? "What you need on remaining work" : "Course targets"}
-                  </p>
-                  {remainingWeight > 0 && finalItem ? (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {sortedCutoffs.map(({ label, minimum }) => {
-                        const needed = neededOnRemaining(minimum);
-                        const value =
-                          needed === null
-                            ? "—"
-                            : needed <= 0
-                              ? "Already there"
-                              : needed > 100
-                                ? "Over 100%"
-                                : `needs ${percent(needed)}`;
-                        return (
-                          <span
-                            key={label}
-                            className="rounded-full bg-card px-3 py-1 text-xs font-semibold text-ink"
-                          >
-                            {label} {value}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-sm font-semibold text-ink">
-                      {finalItem
-                        ? "All graded components are marked."
-                        : "Set a final exam component in the grading scheme."}
-                    </p>
-                  )}
-                  <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
-                    Average needed across the remaining {percent(remainingWeight)} of the configured
-                    grading scheme.
-                  </p>
-                </div>
-
-                <div className="mt-5 divide-y divide-line">
-                  {orderedItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 py-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-ink">{item.title}</p>
-                        <p className="text-xs text-ink-soft">
-                          {percent(item.weight)} of the grade
-                          {item.score !== null
-                            ? ` · ${item.score}/${item.max_score} · ${percent((item.score / item.max_score) * 100)}`
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right text-sm font-semibold text-ink-soft">
-                        {item.score === null ? "Not marked" : `${item.score}/${item.max_score}`}
-                      </div>
-                    </div>
-                  ))}
-                  {courseGradeItems.length === 0 && (
-                    <p className="py-5 text-sm text-ink-soft">
-                      No components yet. Add the course assessment weights to begin.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </article>
-          )}
-        </>
+              </article>
+            );
+          })}
+        </div>
       )}
 
       <Dialog open={schemeOpen} onOpenChange={setSchemeOpen}>
@@ -539,7 +733,11 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                   <p className="truncate text-sm font-semibold text-ink">{item.title}</p>
                   <p className="text-xs text-ink-soft">
                     {percent(item.weight)} ·{" "}
-                    {item.score === null ? "Not marked" : `${item.score}/${item.max_score}`}
+                    {item.best_count
+                      ? `best ${item.best_count}${item.expected_count ? ` of ${item.expected_count}` : ""}`
+                      : item.score === null
+                        ? "Not marked"
+                        : `${item.score}/${item.max_score}`}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">
@@ -696,6 +894,70 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           <Button type="button" className="w-full rounded-full" onClick={openNewItem}>
             + Add assessment component
           </Button>
+          {selectedCourse?.code?.toLowerCase().replace(/[\s-]/g, "") === "ciw501" &&
+            courseGradeItems.length === 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full rounded-full"
+                onClick={() => {
+                  const template = [
+                    ["Final Exam", 40, true],
+                    ["Mid-Term Exam", 20, false],
+                    ["Assignments", 15, false],
+                    ["Quiz and in-class assessment", 15, false],
+                    ["Poster & Report", 10, false],
+                  ] as const;
+                  const items = template.map(([title, weight, isFinal]) => ({
+                    id: crypto.randomUUID(),
+                    course_id: selectedCourseId,
+                    title,
+                    score: null,
+                    max_score: 100,
+                    weight,
+                    is_final: isFinal,
+                  }));
+                  try {
+                    const existingSettings = gradeSettings.find(
+                      (setting) => setting.course_id === selectedCourseId,
+                    );
+                    const settings: CourseGradeSettings = {
+                      course_id: selectedCourseId,
+                      credit_hours: 4,
+                      grade_cutoffs:
+                        existingSettings?.grade_cutoffs ??
+                        Object.fromEntries(
+                          defaultCutoffs.map((cutoff) => [
+                            cutoff.label,
+                            {
+                              minimum: Number(cutoff.minimum),
+                              gpaStart: Number(cutoff.gpaStart),
+                              gpaEnd: Number(cutoff.gpaEnd),
+                            },
+                          ]),
+                        ),
+                    };
+                    persistLocalGrades(
+                      [...gradeItems, ...items],
+                      [
+                        ...gradeSettings.filter(
+                          (setting) => setting.course_id !== selectedCourseId,
+                        ),
+                        settings,
+                      ],
+                    );
+                    setSchemeOpen(false);
+                    toast.success("CIW-501 grading scheme added");
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : "Could not save the grading scheme",
+                    );
+                  }
+                }}
+              >
+                Use CIW-501 sample scheme (4 credit hours)
+              </Button>
+            )}
         </DialogContent>
       </Dialog>
 
@@ -733,9 +995,8 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                 />
               </label>
               <label className="block text-sm text-ink">
-                Maximum score
+                Out of
                 <Input
-                  required
                   type="number"
                   min={0.01}
                   step="0.01"
@@ -745,8 +1006,11 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                 />
               </label>
             </div>
+            <p className="-mt-2 text-xs text-ink-soft">
+              One total is optional. Leave it empty to calculate this item from the marks below.
+            </p>
             <label className="block text-sm text-ink">
-              Score (leave blank until marked)
+              One total (optional)
               <Input
                 type="number"
                 min={0}
@@ -754,9 +1018,163 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                 step="0.01"
                 value={form.score}
                 onChange={(event) => setForm({ ...form, score: event.target.value })}
+                placeholder="Leave empty to add individual marks"
                 className="mt-1 rounded-xl border-line bg-background"
               />
             </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm text-ink">
+                Counts the best
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={form.bestCount}
+                  onChange={(event) => setForm({ ...form, bestCount: event.target.value })}
+                  placeholder="e.g. 2"
+                  className="mt-1 rounded-xl border-line bg-background"
+                />
+              </label>
+              <label className="block text-sm text-ink">
+                Out of how many
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={form.expectedCount}
+                  onChange={(event) => setForm({ ...form, expectedCount: event.target.value })}
+                  placeholder="e.g. 3"
+                  className="mt-1 rounded-xl border-line bg-background"
+                />
+              </label>
+            </div>
+            <p className="-mt-2 text-xs text-ink-soft">
+              For “best 2 out of 3”, enter 2 and 3. The course only counts the top two marks.
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-ink">Marks</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      marks: [
+                        ...form.marks,
+                        {
+                          id: crypto.randomUUID(),
+                          name: "",
+                          score: "",
+                          maxScore: "10",
+                          countsFor: "here",
+                        },
+                      ],
+                    })
+                  }
+                >
+                  Add a mark
+                </Button>
+              </div>
+              {form.marks.map((mark, index) => (
+                <div key={mark.id} className="space-y-2 rounded-xl border border-line p-3">
+                  <Input
+                    aria-label="Mark name"
+                    value={mark.name}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        marks: form.marks.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, name: event.target.value } : item,
+                        ),
+                      })
+                    }
+                    placeholder={`Mark ${index + 1}`}
+                    className="rounded-lg border-line bg-background"
+                  />
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                    <Input
+                      aria-label="Mark score"
+                      type="number"
+                      min={0}
+                      max={Number(mark.maxScore) || undefined}
+                      step="0.01"
+                      value={mark.score}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          marks: form.marks.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, score: event.target.value } : item,
+                          ),
+                        })
+                      }
+                      placeholder="Score"
+                      className="rounded-lg border-line bg-background"
+                    />
+                    <span className="text-sm text-ink-soft">/</span>
+                    <Input
+                      aria-label="Mark out of"
+                      type="number"
+                      min={0.01}
+                      step="0.01"
+                      value={mark.maxScore}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          marks: form.marks.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, maxScore: event.target.value } : item,
+                          ),
+                        })
+                      }
+                      placeholder="Out of"
+                      className="rounded-lg border-line bg-background"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <select
+                      aria-label="Counts for"
+                      value={mark.countsFor}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          marks: form.marks.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, countsFor: event.target.value } : item,
+                          ),
+                        })
+                      }
+                      className="rounded-lg border border-line bg-background px-2 py-1.5 text-xs text-ink"
+                    >
+                      <option value="here">Counts here</option>
+                      {gradeItems
+                        .filter(
+                          (item) =>
+                            item.course_id === selectedCourseId && item.id !== editingItem?.id,
+                        )
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            Move to {item.title}
+                          </option>
+                        ))}
+                      <option value="exclude">Don’t count it</option>
+                    </select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          marks: form.marks.filter((_, itemIndex) => itemIndex !== index),
+                        })
+                      }
+                    >
+                      Remove mark
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
             <label className="flex items-center gap-2 text-sm text-ink">
               <input
                 type="checkbox"
@@ -772,56 +1190,5 @@ export function GradesSection({ courses }: { courses: Course[] }) {
         </DialogContent>
       </Dialog>
     </section>
-  );
-}
-
-export function GradeNotificationsPopup() {
-  const queryClient = useQueryClient();
-  const fetchNotifications = useServerFn(getUnreadGradeNotifications);
-  const dismissNotifications = useServerFn(dismissGradeNotifications);
-  const { data: notifications = [] } = useQuery({
-    queryKey: ["grade-notifications"],
-    queryFn: () => fetchNotifications(),
-    refetchInterval: 60_000,
-  });
-
-  async function dismissPopup() {
-    if (!notifications.length) return;
-    try {
-      await dismissNotifications({
-        data: { notificationIds: notifications.map((item) => item.id) },
-      });
-      await queryClient.invalidateQueries({ queryKey: ["grade-notifications"] });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not dismiss grade alerts");
-    }
-  }
-
-  return (
-    <Dialog open={notifications.length > 0} onOpenChange={(open) => !open && void dismissPopup()}>
-      <DialogContent className="rounded-2xl border-line bg-card">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl text-ink">New grade received</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          {notifications.map((notification) => (
-            <div key={notification.id} className="rounded-xl bg-cream p-3">
-              <p className="text-xs text-ink-soft">
-                {notification.course_name}
-                {notification.course_code ? ` · ${notification.course_code}` : ""}
-              </p>
-              <p className="font-semibold text-ink">{notification.grade_title}</p>
-              <p className="text-sm text-ink-soft">
-                {notification.score}/{notification.max_score} (
-                {percent((notification.score / notification.max_score) * 100)})
-              </p>
-            </div>
-          ))}
-        </div>
-        <Button type="button" className="w-full rounded-full" onClick={() => void dismissPopup()}>
-          Got it
-        </Button>
-      </DialogContent>
-    </Dialog>
   );
 }
