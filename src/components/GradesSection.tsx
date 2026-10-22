@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -161,48 +161,12 @@ export function GradesSection({ courses }: { courses: Course[] }) {
     setCreditHours(String(currentSettings?.credit_hours ?? 3));
   }, [gradeSettings, selectedCourseId]);
 
-  const course = courses.find((item) => item.id === selectedCourseId);
+  const selectedCourse = courses.find((item) => item.id === selectedCourseId);
   const courseGradeItems = gradeItems.filter((item) => item.course_id === selectedCourseId);
-  const orderedItems = useMemo(
-    () => courseGradeItems.slice().sort((a, b) => Number(b.is_final) - Number(a.is_final)),
-    [courseGradeItems],
-  );
+  const orderedItems = courseGradeItems
+    .slice()
+    .sort((a, b) => Number(b.is_final) - Number(a.is_final));
   const totalWeight = courseGradeItems.reduce((sum, item) => sum + item.weight, 0);
-  const markedWeight = courseGradeItems.reduce(
-    (sum, item) => sum + (item.score === null ? 0 : item.weight),
-    0,
-  );
-  const earnedWeightedPoints = courseGradeItems.reduce(
-    (sum, item) => sum + (item.score === null ? 0 : (item.score / item.max_score) * item.weight),
-    0,
-  );
-  const currentAverage = markedWeight > 0 ? (earnedWeightedPoints / markedWeight) * 100 : null;
-  const finalItem = courseGradeItems.find((item) => item.is_final);
-  const remainingWeight = courseGradeItems.reduce(
-    (sum, item) => sum + (item.score === null ? item.weight : 0),
-    0,
-  );
-  const sortedCutoffs = cutoffForm
-    .map(({ label, minimum, gpaStart, gpaEnd }) => ({
-      label,
-      minimum: Number(minimum),
-      gpaStart: Number(gpaStart),
-      gpaEnd: Number(gpaEnd),
-    }))
-    .filter(
-      ({ label, minimum, gpaStart, gpaEnd }) =>
-        label.trim() &&
-        Number.isFinite(minimum) &&
-        minimum >= 0 &&
-        minimum <= 100 &&
-        Number.isFinite(gpaStart) &&
-        Number.isFinite(gpaEnd),
-    )
-    .sort((a, b) => b.minimum - a.minimum);
-  const currentLetterGrade =
-    currentAverage === null
-      ? null
-      : (sortedCutoffs.find(({ minimum }) => currentAverage >= minimum)?.label ?? "Below scale");
 
   const courseSummaries = courses.map((item) => {
     const items = gradeItems.filter((grade) => grade.course_id === item.id);
@@ -240,9 +204,9 @@ export function GradesSection({ courses }: { courses: Course[] }) {
     0,
   );
 
-  function neededOnRemaining(minimum: number) {
-    if (remainingWeight <= 0) return null;
-    return ((minimum - earnedWeightedPoints) / remainingWeight) * 100;
+  function neededOnRemaining(minimum: number, earned: number, remaining: number) {
+    if (remaining <= 0) return null;
+    return ((minimum - earned) / remaining) * 100;
   }
 
   function openNewItem() {
@@ -396,7 +360,7 @@ export function GradesSection({ courses }: { courses: Course[] }) {
             <p className="mt-1 text-xs text-white/90">
               {courses.length} courses · {totalCredits} credit hours
               {gpaCourses.length
-                ? ` · ${Math.min(...defaultCutoffs.map((item) => Number(item.gpaEnd))).toFixed(1)} is the best`
+                ? ` · ${Math.min(...gpaCourses.map((item) => item.gpaPoints ?? 5)).toFixed(1)} is the best`
                 : ""}
             </p>
           </div>
@@ -413,145 +377,194 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           <p className="mt-2 text-sm text-ink-soft">Add a course before setting up its grades.</p>
         </div>
       ) : (
-        <>
-          <label className="block max-w-sm text-sm font-medium text-ink">
-            Course
-            <select
-              value={selectedCourseId}
-              onChange={(event) => setSelectedCourseId(event.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-line bg-card px-3 py-2 text-sm text-ink"
-            >
-              {courses.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                  {item.code ? ` · ${item.code}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="space-y-4">
+          {courses.map((course) => {
+            const items = gradeItems
+              .filter((grade) => grade.course_id === course.id)
+              .sort((a, b) => Number(b.is_final) - Number(a.is_final));
+            const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+            const markedWeight = items.reduce(
+              (sum, item) => sum + (item.score === null ? 0 : item.weight),
+              0,
+            );
+            const earned = items.reduce(
+              (sum, item) =>
+                sum + (item.score === null ? 0 : (item.score / item.max_score) * item.weight),
+              0,
+            );
+            const average = markedWeight > 0 ? (earned / markedWeight) * 100 : null;
+            const remaining = items.reduce(
+              (sum, item) => sum + (item.score === null ? item.weight : 0),
+              0,
+            );
+            const settings = gradeSettings.find((setting) => setting.course_id === course.id);
+            const bands = readCutoffs(settings?.grade_cutoffs)
+              .map((cutoff) => ({
+                ...cutoff,
+                minimum: Number(cutoff.minimum),
+                gpaStart: Number(cutoff.gpaStart),
+                gpaEnd: Number(cutoff.gpaEnd),
+              }))
+              .sort((a, b) => b.minimum - a.minimum);
+            const letter =
+              average === null
+                ? null
+                : (bands.find((band) => average >= band.minimum)?.label ?? "Below scale");
+            const points = average === null ? null : gpaForGrade(average, bands);
+            const final = items.some((item) => item.is_final);
 
-          {course && (
-            <article className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
-              <div className="p-5 sm:p-6">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-soft">
-                      {course.code || "Course"}
-                    </p>
-                    <h3 className="mt-1 font-display text-xl font-medium text-ink">
-                      {course.name}
-                    </h3>
+            return (
+              <article
+                key={course.id}
+                className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm"
+              >
+                <div className="p-4 sm:p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <button
+                      type="button"
+                      className="min-w-0 text-left"
+                      onClick={() => {
+                        setSelectedCourseId(course.id);
+                        setSchemeOpen(true);
+                      }}
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-soft">
+                        {course.code || "Course"} · {settings?.credit_hours ?? 3} CH
+                      </p>
+                      <h3 className="mt-0.5 font-display text-lg font-semibold text-ink">
+                        {course.name}
+                      </h3>
+                    </button>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-ink">
+                          {average === null ? "—" : percent(average)}
+                        </p>
+                        {letter && (
+                          <p className="text-xs font-semibold text-ink-soft">
+                            {letter} · {points?.toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-ink-soft"
+                        onClick={() => {
+                          setSelectedCourseId(course.id);
+                          setSchemeOpen(true);
+                        }}
+                      >
+                        Grading scheme
+                      </Button>
+                    </div>
                   </div>
+
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream">
+                    <div
+                      className="h-full rounded-full bg-rust transition-all"
+                      style={{ width: `${Math.min(100, markedWeight)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-ink-soft">
+                    {percent(markedWeight)} of the grade marked
+                  </p>
+
+                  <div className="mt-3 rounded-xl bg-cream p-3">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="text-xs font-semibold uppercase text-ink-soft">
+                        Coursework
+                      </span>
+                      <span className="text-sm font-bold text-ink">
+                        {percent(earned)} / {percent(totalWeight)}
+                      </span>
+                      {markedWeight > 0 && (
+                        <span className="text-sm font-semibold text-ink">
+                          {percent(average ?? 0)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-ink-soft">
+                      {average === null
+                        ? "No grades marked yet"
+                        : `Average ${percent(average)} on the ${percent(markedWeight)} marked so far`}
+                    </p>
+                  </div>
+
+                  {final && remaining > 0 && (
+                    <div className="mt-3">
+                      <div className="flex flex-wrap gap-2">
+                        {bands.slice(0, 3).map(({ label, minimum }) => {
+                          const needed = neededOnRemaining(minimum, earned, remaining);
+                          const value =
+                            needed === null
+                              ? "—"
+                              : needed <= 0
+                                ? "Already there"
+                                : needed > 100
+                                  ? "Over 100%"
+                                  : `needs ${percent(needed)}`;
+                          return (
+                            <span
+                              key={label}
+                              className="rounded-full bg-cream px-3 py-1 text-xs font-semibold text-ink"
+                            >
+                              {label} {value}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-1.5 text-xs text-ink-soft">
+                        average in the {percent(remaining)} still to come
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mt-3 divide-y divide-line">
+                    {items.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCourseId(course.id);
+                          openEditItem(item);
+                        }}
+                        className="flex w-full items-center justify-between gap-3 py-2 text-left"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-ink">
+                            {item.title}
+                          </span>
+                          <span className="block text-xs text-ink-soft">
+                            {percent(item.weight)} of the grade
+                            {item.score !== null ? ` · ${item.score}/${item.max_score}` : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right text-sm font-semibold text-ink-soft">
+                          {item.score === null ? "Not marked" : `${item.score}/${item.max_score}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="rounded-full border-line bg-background text-ink"
-                    onClick={() => setSchemeOpen(true)}
+                    className="mt-3 w-full rounded-full border-line bg-background text-ink"
+                    onClick={() => {
+                      setSelectedCourseId(course.id);
+                      openNewItem();
+                    }}
                   >
-                    Grading scheme
+                    + Add assessment
                   </Button>
                 </div>
-
-                <div className="mt-5 rounded-2xl bg-violet-600 px-5 py-4 text-white shadow-md">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-3xl font-bold">
-                        {currentAverage === null ? "—" : percent(currentAverage)}
-                      </p>
-                      <p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-white/80">
-                        Average on marked work
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      {currentLetterGrade && (
-                        <p className="text-2xl font-bold">
-                          {currentLetterGrade}
-                          {sortedCutoffs.find((item) => item.label === currentLetterGrade)
-                            ? ` · ${gpaForGrade(currentAverage ?? 0, sortedCutoffs)?.toFixed(2)}`
-                            : ""}
-                        </p>
-                      )}
-                      <p className="text-xs text-white/85">
-                        {percent(markedWeight)} of course marked
-                      </p>
-                      <p className="text-xs text-white/85">{percent(totalWeight)} weighted</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/20">
-                    <div
-                      className="h-full rounded-full bg-orange-400 transition-all"
-                      style={{ width: `${Math.min(100, markedWeight)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-xl bg-cream p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                    {remainingWeight > 0 ? "What you need on remaining work" : "Course targets"}
-                  </p>
-                  {remainingWeight > 0 && finalItem ? (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {sortedCutoffs.map(({ label, minimum }) => {
-                        const needed = neededOnRemaining(minimum);
-                        const value =
-                          needed === null
-                            ? "—"
-                            : needed <= 0
-                              ? "Already there"
-                              : needed > 100
-                                ? "Over 100%"
-                                : `needs ${percent(needed)}`;
-                        return (
-                          <span
-                            key={label}
-                            className="rounded-full bg-card px-3 py-1 text-xs font-semibold text-ink"
-                          >
-                            {label} {value}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-sm font-semibold text-ink">
-                      {finalItem
-                        ? "All graded components are marked."
-                        : "Set a final exam component in the grading scheme."}
-                    </p>
-                  )}
-                  <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
-                    Average needed across the remaining {percent(remainingWeight)} of the configured
-                    grading scheme.
-                  </p>
-                </div>
-
-                <div className="mt-5 divide-y divide-line">
-                  {orderedItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 py-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-ink">{item.title}</p>
-                        <p className="text-xs text-ink-soft">
-                          {percent(item.weight)} of the grade
-                          {item.score !== null
-                            ? ` · ${item.score}/${item.max_score} · ${percent((item.score / item.max_score) * 100)}`
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right text-sm font-semibold text-ink-soft">
-                        {item.score === null ? "Not marked" : `${item.score}/${item.max_score}`}
-                      </div>
-                    </div>
-                  ))}
-                  {courseGradeItems.length === 0 && (
-                    <p className="py-5 text-sm text-ink-soft">
-                      No components yet. Add the course assessment weights to begin.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </article>
-          )}
-        </>
+              </article>
+            );
+          })}
+        </div>
       )}
 
       <Dialog open={schemeOpen} onOpenChange={setSchemeOpen}>
@@ -728,7 +741,7 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           <Button type="button" className="w-full rounded-full" onClick={openNewItem}>
             + Add assessment component
           </Button>
-          {course?.code?.toLowerCase().replace(/[\s-]/g, "") === "ciw501" &&
+          {selectedCourse?.code?.toLowerCase().replace(/[\s-]/g, "") === "ciw501" &&
             courseGradeItems.length === 0 && (
               <Button
                 type="button"
