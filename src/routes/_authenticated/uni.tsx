@@ -52,6 +52,7 @@ import { Label } from "@/components/ui/label";
 import { VoiceButton } from "@/components/VoiceButton";
 import { CoursePhotos } from "@/components/CoursePhotos";
 import { ExamSection } from "@/components/ExamSection";
+import { GradesSection } from "@/components/GradesSection";
 import { isExam } from "@/lib/exams";
 
 export const Route = createFileRoute("/_authenticated/uni")({
@@ -430,9 +431,10 @@ function UniPage() {
       /* storage can be unavailable */
     }
   };
-  const [tab, setTab] = useState<"courses" | "deadlines">(() =>
-    readLS("uni:tab") === "deadlines" ? "deadlines" : "courses",
-  );
+  const [tab, setTab] = useState<"courses" | "deadlines" | "grades">(() => {
+    const stored = readLS("uni:tab");
+    return stored === "deadlines" || stored === "grades" ? stored : "courses";
+  });
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [shownStudied, setShownStudied] = useState<Set<string>>(new Set());
   const [photosOpen, setPhotosOpen] = useState<Set<string>>(new Set());
@@ -565,6 +567,7 @@ function UniPage() {
           [
             ["courses", "Courses"],
             ["deadlines", dueSoon.length > 0 ? `Deadlines · ${dueSoon.length} soon` : "Deadlines"],
+            ["grades", "Grades"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -582,6 +585,8 @@ function UniPage() {
           </button>
         ))}
       </div>
+
+      {tab === "grades" && <GradesSection courses={courses} />}
 
       {tab === "deadlines" && (
         <>

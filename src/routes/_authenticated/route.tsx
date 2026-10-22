@@ -1,7 +1,15 @@
-import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouteContext } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  redirect,
+  useNavigate,
+  useRouteContext,
+} from "@tanstack/react-router";
 
 import { supabase } from "@/integrations/supabase/client";
 import { MeroFloating } from "@/components/MeroFloating";
+import { GradeNotificationsPopup } from "@/components/GradesSection";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { ThemeApplier } from "@/components/ThemeApplier";
 import { WelcomeTour } from "@/components/WelcomeTour";
@@ -53,7 +61,11 @@ function AppLayout() {
           </Link>
           <div className="flex items-center gap-1">
             {navItems.map((item) => (
-              <NavLink key={item.to} to={item.to} label={item.to === "/german" ? settings.habit_page_name : item.label} />
+              <NavLink
+                key={item.to}
+                to={item.to}
+                label={item.to === "/german" ? settings.habit_page_name : item.label}
+              />
             ))}
             <SettingsDialog />
             <SignOut />
@@ -61,6 +73,7 @@ function AppLayout() {
         </div>
       </nav>
       <Outlet />
+      <GradeNotificationsPopup />
       <MeroFloating />
       <ThemeApplier />
       <WelcomeTour />
