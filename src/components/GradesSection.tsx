@@ -13,6 +13,16 @@ type GradeItem = {
   max_score: number;
   weight: number;
   is_final: boolean;
+  marks?: GradeMark[];
+  best_count?: number | null;
+  expected_count?: number | null;
+};
+type GradeMark = {
+  id: string;
+  name: string;
+  score: number | null;
+  max_score: number;
+  counts_for?: string;
 };
 type CourseGradeSettings = {
   course_id: string;
@@ -25,10 +35,22 @@ type GradeForm = {
   maxScore: string;
   weight: string;
   isFinal: boolean;
+  bestCount: string;
+  expectedCount: string;
+  marks: { id: string; name: string; score: string; maxScore: string; countsFor: string }[];
 };
 type GradeCutoff = { label: string; minimum: string; gpaStart: string; gpaEnd: string };
 
-const emptyForm: GradeForm = { title: "", score: "", maxScore: "100", weight: "", isFinal: false };
+const emptyForm: GradeForm = {
+  title: "",
+  score: "",
+  maxScore: "100",
+  weight: "",
+  isFinal: false,
+  bestCount: "",
+  expectedCount: "",
+  marks: [],
+};
 const defaultCutoffs: GradeCutoff[] = [
   { label: "A+", minimum: "94", gpaStart: "0.99", gpaEnd: "0.7" },
   { label: "A", minimum: "90", gpaStart: "1.29", gpaEnd: "1.0" },
@@ -45,6 +67,29 @@ const defaultCutoffs: GradeCutoff[] = [
 ];
 const percent = (value: number) => `${Number.isInteger(value) ? value : value.toFixed(1)}%`;
 type GradeBand = { label: string; minimum: number; gpaStart: number; gpaEnd: number };
+
+function itemProgress(item: GradeItem) {
+  if (item.score !== null) {
+    const ratio = item.max_score > 0 ? item.score / item.max_score : 0;
+    return { markedWeight: item.weight, earnedWeight: item.weight * ratio, ratio };
+  }
+
+  const marks = (item.marks ?? []).filter(
+    (mark) => mark.score !== null && mark.counts_for !== "exclude" && mark.max_score > 0,
+  );
+  if (marks.length === 0) return { markedWeight: 0, earnedWeight: 0, ratio: null };
+
+  const bestCount = Math.max(1, item.best_count ?? item.expected_count ?? marks.length);
+  const selected = marks
+    .slice()
+    .sort((a, b) => (b.score ?? 0) / b.max_score - (a.score ?? 0) / a.max_score)
+    .slice(0, bestCount);
+  const coverage = Math.min(1, selected.length / bestCount);
+  const ratio =
+    selected.reduce((sum, mark) => sum + (mark.score ?? 0) / mark.max_score, 0) / selected.length;
+  const markedWeight = item.weight * coverage;
+  return { markedWeight, earnedWeight: markedWeight * ratio, ratio };
+}
 
 function gpaForGrade(average: number, bands: GradeBand[]) {
   const index = bands.findIndex((band) => average >= band.minimum);
@@ -170,12 +215,9 @@ export function GradesSection({ courses }: { courses: Course[] }) {
 
   const courseSummaries = courses.map((item) => {
     const items = gradeItems.filter((grade) => grade.course_id === item.id);
-    const marked = items.filter((grade) => grade.score !== null);
-    const weight = marked.reduce((sum, grade) => sum + grade.weight, 0);
-    const earned = marked.reduce(
-      (sum, grade) => sum + ((grade.score ?? 0) / grade.max_score) * grade.weight,
-      0,
-    );
+    const progress = items.map(itemProgress);
+    const weight = progress.reduce((sum, grade) => sum + grade.markedWeight, 0);
+    const earned = progress.reduce((sum, grade) => sum + grade.earnedWeight, 0);
     const average = weight > 0 ? (earned / weight) * 100 : null;
     const settings = gradeSettings.find((setting) => setting.course_id === item.id);
     const bands = readCutoffs(settings?.grade_cutoffs)
@@ -225,6 +267,15 @@ export function GradesSection({ courses }: { courses: Course[] }) {
       maxScore: String(item.max_score),
       weight: String(item.weight),
       isFinal: item.is_final,
+      bestCount: item.best_count ? String(item.best_count) : "",
+      expectedCount: item.expected_count ? String(item.expected_count) : "",
+      marks: (item.marks ?? []).map((mark) => ({
+        id: mark.id,
+        name: mark.name,
+        score: mark.score === null ? "" : String(mark.score),
+        maxScore: String(mark.max_score),
+        countsFor: mark.counts_for ?? "here",
+      })),
     });
     setFormOpen(true);
   }
@@ -236,14 +287,45 @@ export function GradesSection({ courses }: { courses: Course[] }) {
     const score = form.score === "" ? null : Number(form.score);
     const maxScore = Number(form.maxScore);
     const weight = Number(form.weight);
+    const bestCount = form.bestCount === "" ? null : Number(form.bestCount);
+    const expectedCount = form.expectedCount === "" ? null : Number(form.expectedCount);
+    const marks: GradeMark[] = form.marks.map((mark) => ({
+      id: mark.id,
+      name: mark.name.trim() || "Mark",
+      score: mark.score === "" ? null : Number(mark.score),
+      max_score: Number(mark.maxScore),
+      counts_for: mark.countsFor,
+    }));
     const courseItems = gradeItems.filter((item) => item.course_id === selectedCourseId);
     try {
       if (!title || !Number.isFinite(weight) || weight <= 0 || weight > 100)
         throw new Error("Enter an assessment name and a weight from 0.1% to 100%.");
-      if (!Number.isFinite(maxScore) || maxScore <= 0)
+      if (score !== null && (!Number.isFinite(maxScore) || maxScore <= 0))
         throw new Error("Maximum score must be greater than 0.");
       if (score !== null && (!Number.isFinite(score) || score < 0 || score > maxScore))
         throw new Error("Score must be between 0 and the maximum score.");
+      if (
+        form.marks.some((mark) => {
+          const markScore = mark.score === "" ? null : Number(mark.score);
+          const markMax = Number(mark.maxScore);
+          return (
+            !Number.isFinite(markMax) ||
+            markMax <= 0 ||
+            (markScore !== null &&
+              (!Number.isFinite(markScore) || markScore < 0 || markScore > markMax))
+          );
+        })
+      )
+        throw new Error("Each mark must be between 0 and its maximum score.");
+      if (bestCount !== null && (!Number.isInteger(bestCount) || bestCount < 1))
+        throw new Error("Counts the best must be a whole number greater than zero.");
+      if (
+        expectedCount !== null &&
+        (!Number.isInteger(expectedCount) ||
+          expectedCount < 1 ||
+          (bestCount !== null && expectedCount < bestCount))
+      )
+        throw new Error("Out of how many must be at least the best count.");
       if (
         courseItems.some(
           (item) => item.id !== editingItem?.id && item.title.toLowerCase() === title.toLowerCase(),
@@ -263,12 +345,57 @@ export function GradesSection({ courses }: { courses: Course[] }) {
         course_id: selectedCourseId,
         title,
         score,
-        max_score: maxScore,
+        max_score: score === null ? maxScore || 100 : maxScore,
         weight,
         is_final: form.isFinal,
+        marks: marks.filter((mark) => mark.counts_for === "here" || mark.counts_for === "exclude"),
+        best_count: bestCount,
+        expected_count: expectedCount,
       };
+      const movedMarks = marks.filter(
+        (mark) => mark.counts_for !== "here" && mark.counts_for !== "exclude",
+      );
+      const movedItems = new Map<string, GradeItem>();
+      for (const mark of movedMarks) {
+        const destination = courseItems.find((candidate) => candidate.id === mark.counts_for);
+        if (!destination) throw new Error("Choose a valid assessment for each moved mark.");
+        const current = movedItems.get(destination.id) ?? destination;
+        const destinationMarks = current.marks ?? [];
+        const oldTotal: GradeMark[] =
+          current.score === null
+            ? []
+            : [
+                {
+                  id: crypto.randomUUID(),
+                  name: current.title,
+                  score: current.score,
+                  max_score: current.max_score,
+                },
+              ];
+        movedItems.set(destination.id, {
+          ...current,
+          score: null,
+          marks: [
+            ...destinationMarks,
+            ...oldTotal,
+            {
+              id: mark.id,
+              name: mark.name,
+              score: mark.score,
+              max_score: mark.max_score,
+              counts_for: "here",
+            },
+          ],
+        });
+      }
       persistLocalGrades(
-        [...gradeItems.filter((existing) => existing.id !== item.id), item],
+        [
+          ...gradeItems.filter(
+            (existing) => existing.id !== item.id && !movedItems.has(existing.id),
+          ),
+          item,
+          ...movedItems.values(),
+        ],
         gradeSettings,
       );
       setFormOpen(false);
@@ -383,20 +510,11 @@ export function GradesSection({ courses }: { courses: Course[] }) {
               .filter((grade) => grade.course_id === course.id)
               .sort((a, b) => Number(b.is_final) - Number(a.is_final));
             const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
-            const markedWeight = items.reduce(
-              (sum, item) => sum + (item.score === null ? 0 : item.weight),
-              0,
-            );
-            const earned = items.reduce(
-              (sum, item) =>
-                sum + (item.score === null ? 0 : (item.score / item.max_score) * item.weight),
-              0,
-            );
+            const itemProgressRows = items.map(itemProgress);
+            const markedWeight = itemProgressRows.reduce((sum, item) => sum + item.markedWeight, 0);
+            const earned = itemProgressRows.reduce((sum, item) => sum + item.earnedWeight, 0);
             const average = markedWeight > 0 ? (earned / markedWeight) * 100 : null;
-            const remaining = items.reduce(
-              (sum, item) => sum + (item.score === null ? item.weight : 0),
-              0,
-            );
+            const remaining = Math.max(0, totalWeight - markedWeight);
             const settings = gradeSettings.find((setting) => setting.course_id === course.id);
             const bands = readCutoffs(settings?.grade_cutoffs)
               .map((cutoff) => ({
@@ -538,11 +656,24 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                           </span>
                           <span className="block text-xs text-ink-soft">
                             {percent(item.weight)} of the grade
-                            {item.score !== null ? ` · ${item.score}/${item.max_score}` : ""}
+                            {item.best_count
+                              ? ` · best ${item.best_count}${item.expected_count ? ` of ${item.expected_count}` : ""}`
+                              : ""}
+                            {item.marks?.length
+                              ? ` · ${item.marks.filter((mark) => mark.score !== null && mark.counts_for !== "exclude").length} mark${item.marks.filter((mark) => mark.score !== null && mark.counts_for !== "exclude").length === 1 ? "" : "s"}`
+                              : item.score !== null
+                                ? ` · ${item.score}/${item.max_score}`
+                                : ""}
                           </span>
                         </span>
                         <span className="shrink-0 text-right text-sm font-semibold text-ink-soft">
-                          {item.score === null ? "Not marked" : `${item.score}/${item.max_score}`}
+                          {itemProgress(item).ratio === null
+                            ? "Not marked"
+                            : item.best_count
+                              ? `${percent((itemProgress(item).ratio ?? 0) * 100)}${itemProgress(item).markedWeight < item.weight ? " so far" : ""}`
+                              : item.score !== null
+                                ? `${item.score}/${item.max_score}`
+                                : percent((itemProgress(item).ratio ?? 0) * 100)}
                         </span>
                       </button>
                     ))}
@@ -584,7 +715,11 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                   <p className="truncate text-sm font-semibold text-ink">{item.title}</p>
                   <p className="text-xs text-ink-soft">
                     {percent(item.weight)} ·{" "}
-                    {item.score === null ? "Not marked" : `${item.score}/${item.max_score}`}
+                    {item.best_count
+                      ? `best ${item.best_count}${item.expected_count ? ` of ${item.expected_count}` : ""}`
+                      : item.score === null
+                        ? "Not marked"
+                        : `${item.score}/${item.max_score}`}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">
@@ -842,9 +977,8 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                 />
               </label>
               <label className="block text-sm text-ink">
-                Maximum score
+                Out of
                 <Input
-                  required
                   type="number"
                   min={0.01}
                   step="0.01"
@@ -854,8 +988,11 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                 />
               </label>
             </div>
+            <p className="-mt-2 text-xs text-ink-soft">
+              One total is optional. Leave it empty to calculate this item from the marks below.
+            </p>
             <label className="block text-sm text-ink">
-              Score (leave blank until marked)
+              One total (optional)
               <Input
                 type="number"
                 min={0}
@@ -863,9 +1000,163 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                 step="0.01"
                 value={form.score}
                 onChange={(event) => setForm({ ...form, score: event.target.value })}
+                placeholder="Leave empty to add individual marks"
                 className="mt-1 rounded-xl border-line bg-background"
               />
             </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm text-ink">
+                Counts the best
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={form.bestCount}
+                  onChange={(event) => setForm({ ...form, bestCount: event.target.value })}
+                  placeholder="e.g. 2"
+                  className="mt-1 rounded-xl border-line bg-background"
+                />
+              </label>
+              <label className="block text-sm text-ink">
+                Out of how many
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={form.expectedCount}
+                  onChange={(event) => setForm({ ...form, expectedCount: event.target.value })}
+                  placeholder="e.g. 3"
+                  className="mt-1 rounded-xl border-line bg-background"
+                />
+              </label>
+            </div>
+            <p className="-mt-2 text-xs text-ink-soft">
+              For “best 2 out of 3”, enter 2 and 3. The course only counts the top two marks.
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-ink">Marks</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      marks: [
+                        ...form.marks,
+                        {
+                          id: crypto.randomUUID(),
+                          name: "",
+                          score: "",
+                          maxScore: "10",
+                          countsFor: "here",
+                        },
+                      ],
+                    })
+                  }
+                >
+                  Add a mark
+                </Button>
+              </div>
+              {form.marks.map((mark, index) => (
+                <div key={mark.id} className="space-y-2 rounded-xl border border-line p-3">
+                  <Input
+                    aria-label="Mark name"
+                    value={mark.name}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        marks: form.marks.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, name: event.target.value } : item,
+                        ),
+                      })
+                    }
+                    placeholder={`Mark ${index + 1}`}
+                    className="rounded-lg border-line bg-background"
+                  />
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                    <Input
+                      aria-label="Mark score"
+                      type="number"
+                      min={0}
+                      max={Number(mark.maxScore) || undefined}
+                      step="0.01"
+                      value={mark.score}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          marks: form.marks.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, score: event.target.value } : item,
+                          ),
+                        })
+                      }
+                      placeholder="Score"
+                      className="rounded-lg border-line bg-background"
+                    />
+                    <span className="text-sm text-ink-soft">/</span>
+                    <Input
+                      aria-label="Mark out of"
+                      type="number"
+                      min={0.01}
+                      step="0.01"
+                      value={mark.maxScore}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          marks: form.marks.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, maxScore: event.target.value } : item,
+                          ),
+                        })
+                      }
+                      placeholder="Out of"
+                      className="rounded-lg border-line bg-background"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <select
+                      aria-label="Counts for"
+                      value={mark.countsFor}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          marks: form.marks.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, countsFor: event.target.value } : item,
+                          ),
+                        })
+                      }
+                      className="rounded-lg border border-line bg-background px-2 py-1.5 text-xs text-ink"
+                    >
+                      <option value="here">Counts here</option>
+                      {gradeItems
+                        .filter(
+                          (item) =>
+                            item.course_id === selectedCourseId && item.id !== editingItem?.id,
+                        )
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            Move to {item.title}
+                          </option>
+                        ))}
+                      <option value="exclude">Don’t count it</option>
+                    </select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          marks: form.marks.filter((_, itemIndex) => itemIndex !== index),
+                        })
+                      }
+                    >
+                      Remove mark
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
             <label className="flex items-center gap-2 text-sm text-ink">
               <input
                 type="checkbox"
