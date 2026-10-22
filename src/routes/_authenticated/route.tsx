@@ -9,7 +9,6 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import { MeroFloating } from "@/components/MeroFloating";
-import { GradeNotificationsPopup } from "@/components/GradesSection";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { ThemeApplier } from "@/components/ThemeApplier";
 import { WelcomeTour } from "@/components/WelcomeTour";
@@ -73,7 +72,6 @@ function AppLayout() {
         </div>
       </nav>
       <Outlet />
-      <GradeNotificationsPopup />
       <MeroFloating />
       <ThemeApplier />
       <WelcomeTour />

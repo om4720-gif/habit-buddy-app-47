@@ -1,26 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  createGradeItem,
-  deleteGradeItem,
-  dismissGradeNotifications,
-  getCourseGradeSettings,
-  getGradeInboxToken,
-  getGradeItems,
-  getUnreadGradeNotifications,
-  resetGradeInboxToken,
-  saveCourseGradeSettings,
-  updateGradeItem,
-} from "@/lib/grades.functions";
-
 type Course = { id: string; name: string; code: string | null; color: string | null };
-type GradeItem = Awaited<ReturnType<typeof getGradeItems>>[number];
+type GradeItem = {
+  id: string;
+  course_id: string;
+  title: string;
+  score: number | null;
+  max_score: number;
+  weight: number;
+  is_final: boolean;
+};
+type CourseGradeSettings = {
+  course_id: string;
+  credit_hours: number;
+  grade_cutoffs: Record<string, { minimum: number; gpaStart: number; gpaEnd: number }>;
+};
 type GradeForm = {
   title: string;
   score: string;
@@ -83,14 +81,25 @@ function readCutoffs(value: unknown): GradeCutoff[] {
   return rows.length ? rows : defaultCutoffs;
 }
 
+const LOCAL_GRADES_KEY = "habit-buddy:course-grades:v1";
+
+function readLocalGrades(): { items: GradeItem[]; settings: CourseGradeSettings[] } {
+  try {
+    const raw = localStorage.getItem(LOCAL_GRADES_KEY);
+    if (!raw) return { items: [], settings: [] };
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return { items: [], settings: [] };
+    const data = parsed as { items?: unknown; settings?: unknown };
+    return {
+      items: Array.isArray(data.items) ? (data.items as GradeItem[]) : [],
+      settings: Array.isArray(data.settings) ? (data.settings as CourseGradeSettings[]) : [],
+    };
+  } catch {
+    return { items: [], settings: [] };
+  }
+}
+
 export function GradesSection({ courses }: { courses: Course[] }) {
-  const queryClient = useQueryClient();
-  const fetchGradeItems = useServerFn(getGradeItems);
-  const fetchSettings = useServerFn(getCourseGradeSettings);
-  const createItem = useServerFn(createGradeItem);
-  const updateItem = useServerFn(updateGradeItem);
-  const deleteItem = useServerFn(deleteGradeItem);
-  const saveSettings = useServerFn(saveCourseGradeSettings);
   const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id ?? "");
   const [schemeOpen, setSchemeOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -98,15 +107,49 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   const [form, setForm] = useState<GradeForm>(emptyForm);
   const [cutoffForm, setCutoffForm] = useState<GradeCutoff[]>(defaultCutoffs);
   const [creditHours, setCreditHours] = useState("3");
+  const [gradeItems, setGradeItems] = useState<GradeItem[]>([]);
+  const [gradeSettings, setGradeSettings] = useState<CourseGradeSettings[]>([]);
 
-  const { data: gradeItems = [] } = useQuery({
-    queryKey: ["grade-items"],
-    queryFn: () => fetchGradeItems({ data: {} }),
-  });
-  const { data: gradeSettings = [] } = useQuery({
-    queryKey: ["course-grade-settings"],
-    queryFn: () => fetchSettings({ data: {} }),
-  });
+  useEffect(() => {
+    const saved = readLocalGrades();
+    setGradeItems(saved.items);
+    setGradeSettings(saved.settings);
+  }, []);
+
+  function persistLocalGrades(items: GradeItem[], settings: CourseGradeSettings[]) {
+    localStorage.setItem(LOCAL_GRADES_KEY, JSON.stringify({ items, settings }));
+    setGradeItems(items);
+    setGradeSettings(settings);
+  }
+
+  function updateGradeSettings(
+    courseId: string,
+    update: Partial<Omit<CourseGradeSettings, "course_id">>,
+  ) {
+    const existing = gradeSettings.find((setting) => setting.course_id === courseId);
+    const next: CourseGradeSettings = {
+      course_id: courseId,
+      credit_hours: existing?.credit_hours ?? 3,
+      grade_cutoffs:
+        existing?.grade_cutoffs ??
+        Object.fromEntries(
+          defaultCutoffs.map((item) => [
+            item.label,
+            {
+              minimum: Number(item.minimum),
+              gpaStart: Number(item.gpaStart),
+              gpaEnd: Number(item.gpaEnd),
+            },
+          ]),
+        ),
+      ...update,
+    };
+    persistLocalGrades(gradeItems, [
+      ...gradeSettings.filter((setting) => setting.course_id !== courseId),
+      next,
+    ]);
+  }
+
   useEffect(() => {
     if (!courses.some((course) => course.id === selectedCourseId))
       setSelectedCourseId(courses[0]?.id ?? "");
@@ -203,12 +246,14 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   }
 
   function openNewItem() {
+    setSchemeOpen(false);
     setEditingItem(null);
     setForm(emptyForm);
     setFormOpen(true);
   }
 
   function openEditItem(item: GradeItem) {
+    setSchemeOpen(false);
     setEditingItem(item);
     setForm({
       title: item.title,
@@ -223,18 +268,45 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   async function handleSaveItem(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedCourseId) return;
-    const data = {
-      courseId: selectedCourseId,
-      title: form.title.trim(),
-      score: form.score === "" ? null : Number(form.score),
-      maxScore: Number(form.maxScore),
-      weight: Number(form.weight),
-      isFinal: form.isFinal,
-    };
+    const title = form.title.trim();
+    const score = form.score === "" ? null : Number(form.score);
+    const maxScore = Number(form.maxScore);
+    const weight = Number(form.weight);
+    const courseItems = gradeItems.filter((item) => item.course_id === selectedCourseId);
     try {
-      if (editingItem) await updateItem({ data: { ...data, gradeItemId: editingItem.id } });
-      else await createItem({ data });
-      await queryClient.invalidateQueries({ queryKey: ["grade-items"] });
+      if (!title || !Number.isFinite(weight) || weight <= 0 || weight > 100)
+        throw new Error("Enter an assessment name and a weight from 0.1% to 100%.");
+      if (!Number.isFinite(maxScore) || maxScore <= 0)
+        throw new Error("Maximum score must be greater than 0.");
+      if (score !== null && (!Number.isFinite(score) || score < 0 || score > maxScore))
+        throw new Error("Score must be between 0 and the maximum score.");
+      if (
+        courseItems.some(
+          (item) => item.id !== editingItem?.id && item.title.toLowerCase() === title.toLowerCase(),
+        )
+      )
+        throw new Error("This assessment already exists in the grading scheme.");
+      if (form.isFinal && courseItems.some((item) => item.id !== editingItem?.id && item.is_final))
+        throw new Error("This course already has a final exam component.");
+      const otherWeight = courseItems
+        .filter((item) => item.id !== editingItem?.id)
+        .reduce((sum, item) => sum + item.weight, 0);
+      if (otherWeight + weight > 100.0001)
+        throw new Error("Course grade weights cannot add up to more than 100%.");
+
+      const item: GradeItem = {
+        id: editingItem?.id ?? crypto.randomUUID(),
+        course_id: selectedCourseId,
+        title,
+        score,
+        max_score: maxScore,
+        weight,
+        is_final: form.isFinal,
+      };
+      persistLocalGrades(
+        [...gradeItems.filter((existing) => existing.id !== item.id), item],
+        gradeSettings,
+      );
       setFormOpen(false);
       toast.success(editingItem ? "Grading component updated" : "Grading component added");
     } catch (error) {
@@ -245,8 +317,10 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   async function handleDeleteItem(item: GradeItem) {
     if (!window.confirm(`Remove ${item.title} from this course grading scheme?`)) return;
     try {
-      await deleteItem({ data: { gradeItemId: item.id } });
-      await queryClient.invalidateQueries({ queryKey: ["grade-items"] });
+      persistLocalGrades(
+        gradeItems.filter((grade) => grade.id !== item.id),
+        gradeSettings,
+      );
       toast.success("Grading component removed");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not remove the component");
@@ -283,33 +357,19 @@ export function GradesSection({ courses }: { courses: Course[] }) {
       }
       cutoffs[normalizedLabel] = { minimum: value, gpaStart: start, gpaEnd: end };
     }
+    const parsedCreditHours = Number(creditHours);
+    if (!Number.isFinite(parsedCreditHours) || parsedCreditHours <= 0 || parsedCreditHours > 30) {
+      toast.error("Credit hours must be more than 0 and no more than 30.");
+      return;
+    }
     try {
-      await saveSettings({
-        data: {
-          courseId: selectedCourseId,
-          creditHours: Number(creditHours),
-          gradeCutoffs: cutoffs,
-        },
+      updateGradeSettings(selectedCourseId, {
+        credit_hours: parsedCreditHours,
+        grade_cutoffs: cutoffs,
       });
-      await queryClient.invalidateQueries({ queryKey: ["course-grade-settings"] });
       toast.success("Grading cutoffs saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save grade cutoffs");
-    }
-  }
-
-  async function copyInboxLink(reset = false) {
-    try {
-      const { token } = reset ? await resetGradeInboxToken() : await getGradeInboxToken();
-      const url = `${window.location.origin}/api/public/grades?key=${token}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success(reset ? "New grade inbox link copied" : "Grade inbox link copied");
-      } catch {
-        toast.message(url);
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not create the grade inbox link");
     }
   }
 
@@ -321,29 +381,6 @@ export function GradesSection({ courses }: { courses: Course[] }) {
             Course grades
           </p>
           <h2 className="mt-1 font-display text-2xl font-medium text-ink">Grades</h2>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="rounded-full border-line bg-card text-ink"
-            onClick={() => void copyInboxLink()}
-          >
-            Copy inbox link
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="rounded-full text-ink-soft"
-            onClick={() => {
-              if (window.confirm("Reset this grade inbox link? The old link will stop working."))
-                void copyInboxLink(true);
-            }}
-          >
-            Reset link
-          </Button>
         </div>
       </div>
 
@@ -367,13 +404,8 @@ export function GradesSection({ courses }: { courses: Course[] }) {
       </div>
 
       <div className="rounded-2xl border border-line bg-card px-4 py-3 text-xs leading-relaxed text-ink-soft">
-        The private inbox accepts grade updates from an authorized GUC integration. It never asks
-        for your GUC password. Checks are limited to 3 per rolling 24 hours; resetting the link does
-        not reset this limit. Send a JSON POST with the course code and exact assessment names from
-        the grading scheme, for example:
-        <pre className="mt-2 overflow-x-auto rounded-lg bg-cream p-3 text-[11px] text-ink">
-          {`{"course_code":"CIW 501","grades":[{"title":"Final exam","score":87,"max_score":100}]}`}
-        </pre>
+        Grades are saved in this browser without a Supabase migration. They are not yet synced to
+        other devices or connected to GUC.
       </div>
 
       {courses.length === 0 ? (
@@ -696,6 +728,70 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           <Button type="button" className="w-full rounded-full" onClick={openNewItem}>
             + Add assessment component
           </Button>
+          {course?.code?.toLowerCase().replace(/[\s-]/g, "") === "ciw501" &&
+            courseGradeItems.length === 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full rounded-full"
+                onClick={() => {
+                  const template = [
+                    ["Final Exam", 40, true],
+                    ["Mid-Term Exam", 20, false],
+                    ["Assignments", 15, false],
+                    ["Quiz and in-class assessment", 15, false],
+                    ["Poster & Report", 10, false],
+                  ] as const;
+                  const items = template.map(([title, weight, isFinal]) => ({
+                    id: crypto.randomUUID(),
+                    course_id: selectedCourseId,
+                    title,
+                    score: null,
+                    max_score: 100,
+                    weight,
+                    is_final: isFinal,
+                  }));
+                  try {
+                    const existingSettings = gradeSettings.find(
+                      (setting) => setting.course_id === selectedCourseId,
+                    );
+                    const settings: CourseGradeSettings = {
+                      course_id: selectedCourseId,
+                      credit_hours: 4,
+                      grade_cutoffs:
+                        existingSettings?.grade_cutoffs ??
+                        Object.fromEntries(
+                          defaultCutoffs.map((cutoff) => [
+                            cutoff.label,
+                            {
+                              minimum: Number(cutoff.minimum),
+                              gpaStart: Number(cutoff.gpaStart),
+                              gpaEnd: Number(cutoff.gpaEnd),
+                            },
+                          ]),
+                        ),
+                    };
+                    persistLocalGrades(
+                      [...gradeItems, ...items],
+                      [
+                        ...gradeSettings.filter(
+                          (setting) => setting.course_id !== selectedCourseId,
+                        ),
+                        settings,
+                      ],
+                    );
+                    setSchemeOpen(false);
+                    toast.success("CIW-501 grading scheme added");
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : "Could not save the grading scheme",
+                    );
+                  }
+                }}
+              >
+                Use CIW-501 sample scheme (4 credit hours)
+              </Button>
+            )}
         </DialogContent>
       </Dialog>
 
@@ -772,56 +868,5 @@ export function GradesSection({ courses }: { courses: Course[] }) {
         </DialogContent>
       </Dialog>
     </section>
-  );
-}
-
-export function GradeNotificationsPopup() {
-  const queryClient = useQueryClient();
-  const fetchNotifications = useServerFn(getUnreadGradeNotifications);
-  const dismissNotifications = useServerFn(dismissGradeNotifications);
-  const { data: notifications = [] } = useQuery({
-    queryKey: ["grade-notifications"],
-    queryFn: () => fetchNotifications(),
-    refetchInterval: 60_000,
-  });
-
-  async function dismissPopup() {
-    if (!notifications.length) return;
-    try {
-      await dismissNotifications({
-        data: { notificationIds: notifications.map((item) => item.id) },
-      });
-      await queryClient.invalidateQueries({ queryKey: ["grade-notifications"] });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not dismiss grade alerts");
-    }
-  }
-
-  return (
-    <Dialog open={notifications.length > 0} onOpenChange={(open) => !open && void dismissPopup()}>
-      <DialogContent className="rounded-2xl border-line bg-card">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl text-ink">New grade received</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          {notifications.map((notification) => (
-            <div key={notification.id} className="rounded-xl bg-cream p-3">
-              <p className="text-xs text-ink-soft">
-                {notification.course_name}
-                {notification.course_code ? ` · ${notification.course_code}` : ""}
-              </p>
-              <p className="font-semibold text-ink">{notification.grade_title}</p>
-              <p className="text-sm text-ink-soft">
-                {notification.score}/{notification.max_score} (
-                {percent((notification.score / notification.max_score) * 100)})
-              </p>
-            </div>
-          ))}
-        </div>
-        <Button type="button" className="w-full rounded-full" onClick={() => void dismissPopup()}>
-          Got it
-        </Button>
-      </DialogContent>
-    </Dialog>
   );
 }
