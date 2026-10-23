@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  getGradeInboxToken,
+  resetGradeInboxToken,
   createGradeItem,
   deleteGradeItem,
   getCourseGradeSettings,
@@ -181,6 +183,13 @@ export function GradesSection({ courses }: { courses: Course[] }) {
     queryKey: ["grade-items"],
     queryFn: () => fetchItems({ data: {} }),
   });
+  const fetchInbox = useServerFn(getGradeInboxToken);
+  const resetInbox = useServerFn(resetGradeInboxToken);
+  const { data: inbox, refetch: refetchInbox } = useQuery({
+    queryKey: ["grade-inbox-token"],
+    queryFn: () => fetchInbox(),
+  });
+  const inboxLink = inbox ? `${window.location.origin}/api/public/grades?key=${inbox.token}` : "";
   const { data: remoteSettings } = useQuery({
     queryKey: ["grade-settings"],
     queryFn: () => fetchSettings({ data: {} }),
@@ -641,6 +650,57 @@ export function GradesSection({ courses }: { courses: Course[] }) {
             Course grades
           </p>
           <h2 className="mt-1 font-display text-2xl font-medium text-ink">Grades</h2>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-card p-4">
+        <p className="text-sm font-semibold text-ink">Grade inbox link</p>
+        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+          The Chrome extension sends new GUC grades to this link. Keep it private: anyone with it can add grades to your account.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            readOnly
+            value={inboxLink}
+            placeholder="Loading…"
+            aria-label="Grade inbox link"
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-w-0 flex-1 rounded-xl border border-line bg-background px-3 py-2 text-xs text-ink"
+          />
+          <Button
+            type="button"
+            size="sm"
+            className="rounded-full"
+            disabled={!inboxLink}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(inboxLink);
+                toast.success("Inbox link copied");
+              } catch {
+                toast.message(inboxLink);
+              }
+            }}
+          >
+            Copy
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="rounded-full"
+            onClick={async () => {
+              if (!window.confirm("Reset the link? The old one stops working right away, so update the extension.")) return;
+              try {
+                await resetInbox();
+                await refetchInbox();
+                toast.success("New link created. Paste it into the extension.");
+              } catch {
+                toast.error("Could not reset the link");
+              }
+            }}
+          >
+            Reset
+          </Button>
         </div>
       </div>
 
