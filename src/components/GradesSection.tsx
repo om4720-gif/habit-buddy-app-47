@@ -678,6 +678,37 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                     </div>
                   )}
 
+                  {(() => {
+                    // What you need on the final itself. The rest of the unmarked work is assumed to
+                    // come in at your current average, so the number changes as you mark more items.
+                    const finalItem = items.find((item) => item.is_final && item.score === null);
+                    if (!finalItem || average === null || remaining <= 0) return null;
+                    const restWeight = Math.max(0, remaining - finalItem.weight);
+                    const assumedRest = (average / 100) * restWeight;
+                    return (
+                      <div className="mt-3 rounded-xl bg-cream/60 px-3 py-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-soft">
+                          Needed on the final ({percent(finalItem.weight)})
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap gap-2">
+                          {bands.slice(0, 3).map(({ label, minimum }) => {
+                            const need = ((minimum - earned - assumedRest) / finalItem.weight) * 100;
+                            const value =
+                              need <= 0 ? "Already there" : need > 100 ? "Not possible" : `needs ${percent(need)}`;
+                            return (
+                              <span key={label} className="rounded-full bg-card px-3 py-1 text-xs font-semibold text-ink ring-1 ring-line">
+                                {label} {value}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <p className="mt-1.5 text-[11px] text-ink-soft">
+                          Assumes the other {percent(restWeight)} still to come lands at your current {percent(average)} average.
+                        </p>
+                      </div>
+                    );
+                  })()}
+
                   <div className="mt-3 divide-y divide-line">
                     {items.map((item) => (
                       <button
