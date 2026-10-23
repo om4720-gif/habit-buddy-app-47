@@ -131,10 +131,11 @@ export const Route = createFileRoute("/api/public/grades")({
         if (coursesError) return json(500, { error: "Could not find the course." });
         const normalizedCode = parsed.data.course_code?.toLowerCase();
         const normalizedName = parsed.data.course_name?.toLowerCase();
+        // Match by course code or by course name: the extension sends both, and either one is enough.
         const course = (courses ?? []).find(
           (candidate) =>
-            (!normalizedCode || candidate.code?.toLowerCase() === normalizedCode) &&
-            (!normalizedName || candidate.name.toLowerCase() === normalizedName),
+            (!!normalizedCode && candidate.code?.toLowerCase() === normalizedCode) ||
+            (!!normalizedName && candidate.name.toLowerCase() === normalizedName),
         );
         if (!course)
           return json(404, {
