@@ -165,7 +165,7 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   }, []);
 
   /** Saves weights from the import dialog. Returns an error message, or null when saved. */
-  function importWeights(courseId: string, rows: WeightRow[]): string | null {
+  function importWeights(courseId: string, rows: WeightRow[], creditHours: number | null): string | null {
     const current = gradeItems.filter((item) => item.course_id === courseId);
     const problem = checkWeights(rows, current);
     if (problem) return problem;
@@ -178,10 +178,31 @@ export function GradesSection({ courses }: { courses: Course[] }) {
       weight: row.weight,
       is_final: row.isFinal,
       marks: [],
-      best_count: null,
-      expected_count: null,
+      best_count: row.bestCount ?? null,
+      expected_count: row.expectedCount ?? null,
     }));
-    persistLocalGrades([...gradeItems, ...created], gradeSettings);
+    let nextSettings = gradeSettings;
+    if (creditHours !== null && creditHours > 0 && creditHours <= 30) {
+      const hasSettings = gradeSettings.some((setting) => setting.course_id === courseId);
+      nextSettings = hasSettings
+        ? gradeSettings.map((setting) =>
+            setting.course_id === courseId ? { ...setting, credit_hours: creditHours } : setting,
+          )
+        : [
+            ...gradeSettings,
+            {
+              course_id: courseId,
+              credit_hours: creditHours,
+              grade_cutoffs: Object.fromEntries(
+                defaultCutoffs.map((item) => [
+                  item.label,
+                  { minimum: Number(item.minimum), gpaStart: Number(item.gpaStart), gpaEnd: Number(item.gpaEnd) },
+                ]),
+              ),
+            },
+          ];
+    }
+    persistLocalGrades([...gradeItems, ...created], nextSettings);
     return null;
   }
 
@@ -1090,8 +1111,8 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           onOpenChange={(open) => !open && setImportCourseId(null)}
           courseName={courses.find((c) => c.id === importCourseId)?.name ?? "Course"}
           existing={gradeItems.filter((item) => item.course_id === importCourseId)}
-          onImport={(rows) => {
-            const error = importWeights(importCourseId, rows);
+          onImport={(rows, creditHours) => {
+            const error = importWeights(importCourseId, rows, creditHours);
             if (!error) setImportCourseId(null);
             return error;
           }}

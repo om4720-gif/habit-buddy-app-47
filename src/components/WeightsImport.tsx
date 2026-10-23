@@ -25,12 +25,13 @@ export function WeightsImport({
   courseName: string;
   existing: Existing;
   /** Returns an error message to show, or null when saved. */
-  onImport: (rows: WeightRow[]) => string | null;
+  onImport: (rows: WeightRow[], creditHours: number | null) => string | null;
 }) {
   const scan = useServerFn(scanWeights);
   const [text, setText] = useState("");
   const [rows, setRows] = useState<(WeightRow & { key: number; include: boolean })[] | null>(null);
   const [skipped, setSkipped] = useState<string[]>([]);
+  const [creditHours, setCreditHours] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const keyRef = useRef(0);
 
@@ -38,6 +39,7 @@ export function WeightsImport({
     setText("");
     setRows(null);
     setSkipped([]);
+    setCreditHours(null);
   };
   const close = (o: boolean) => {
     if (!o) reset();
@@ -52,8 +54,9 @@ export function WeightsImport({
   };
 
   function readText() {
-    const { rows: found, skipped: bad } = parseWeightsText(text);
+    const { rows: found, skipped: bad, creditHours: credits } = parseWeightsText(text);
     setSkipped(bad.slice(0, 8));
+    setCreditHours(credits);
     if (found.length === 0) {
       toast.error("I couldn't find any weights. Write one per line, like “Midterm 30%”.");
       return;
@@ -86,12 +89,18 @@ export function WeightsImport({
 
   function save() {
     if (!rows) return;
-    const list = included.map(({ title, weight, isFinal }) => ({ title: title.trim(), weight, isFinal }));
+    const list = included.map(({ title, weight, isFinal, bestCount, expectedCount }) => ({
+      title: title.trim(),
+      weight,
+      isFinal,
+      bestCount: bestCount ?? null,
+      expectedCount: expectedCount ?? null,
+    }));
     if (list.some((r) => !r.title)) {
       toast.error("Every included assessment needs a name.");
       return;
     }
-    const error = onImport(list);
+    const error = onImport(list, creditHours);
     if (error) {
       toast.error(error);
       return;
@@ -147,7 +156,10 @@ export function WeightsImport({
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-ink-soft">Check each line, then add the ones you want.</p>
+            <p className="text-sm text-ink-soft">
+              Check each line, then add the ones you want.
+              {creditHours !== null && <span> Credit hours: {creditHours}.</span>}
+            </p>
             <ul className="space-y-2">
               {rows.map((r) => (
                 <li key={r.key} className={`flex items-center gap-2 rounded-2xl border border-line p-2 ${r.include ? "bg-card" : "opacity-60"}`}>
@@ -158,6 +170,11 @@ export function WeightsImport({
                     onChange={(e) => setRows(rows.map((x) => (x.key === r.key ? { ...x, include: e.target.checked } : x)))}
                     className="size-4 accent-[var(--rust)]"
                   />
+                  {r.bestCount ? (
+                    <span className="shrink-0 rounded-full bg-sand px-2 py-0.5 text-[10px] font-semibold text-ink-soft">
+                      best {r.bestCount} of {r.expectedCount}
+                    </span>
+                  ) : null}
                   <Input
                     value={r.title}
                     maxLength={200}
