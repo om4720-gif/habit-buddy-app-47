@@ -16,6 +16,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ImportGrades } from "@/components/ImportGrades";
 import { WeightsImport } from "@/components/WeightsImport";
 import { checkWeights, type WeightRow } from "@/lib/weights";
 import { Input } from "@/components/ui/input";
@@ -170,6 +171,7 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   const [gradeItems, setGradeItems] = useState<GradeItem[]>([]);
   const [gradeSettings, setGradeSettings] = useState<CourseGradeSettings[]>([]);
   const [importCourseId, setImportCourseId] = useState<string | null>(null);
+  const [gradeFileOpen, setGradeFileOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const fetchItems = useServerFn(getGradeItems);
@@ -658,6 +660,29 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           <h2 className="mt-1 font-display text-2xl font-medium text-ink">Grades</h2>
         </div>
       </div>
+
+      <div className="flex justify-end">
+        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => setGradeFileOpen(true)}>
+          Import grades from a file
+        </Button>
+      </div>
+
+      <ImportGrades
+        open={gradeFileOpen}
+        onOpenChange={setGradeFileOpen}
+        courses={courses}
+        items={gradeItems}
+        onApply={(updates) => {
+          const byId = new Map(updates.map((u) => [u.id, u]));
+          persistLocalGrades(
+            gradeItems.map((item) => {
+              const u = byId.get(item.id);
+              return u ? { ...item, score: u.score, max_score: u.max_score } : item;
+            }),
+            gradeSettings,
+          );
+        }}
+      />
 
       <div className="rounded-2xl border border-line bg-card p-4">
         <p className="text-sm font-semibold text-ink">Grade inbox link</p>
