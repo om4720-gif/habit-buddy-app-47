@@ -683,6 +683,15 @@ export function GradesSection({ courses }: { courses: Course[] }) {
             const earned = itemProgressRows.reduce((sum, item) => sum + item.earnedWeight, 0);
             const average = markedWeight > 0 ? (earned / markedWeight) * 100 : null;
             const remaining = Math.max(0, totalWeight - markedWeight);
+            // Coursework is everything except the final exam, so the final never counts toward it.
+            const courseworkItems = items.filter((item) => !item.is_final);
+            const finalWeight = items.filter((item) => item.is_final).reduce((sum, item) => sum + item.weight, 0);
+            // Coursework total is 100% minus the final's percentage (not the sum of the other items).
+            const courseworkWeight = finalWeight > 0 ? Math.max(0, 100 - finalWeight) : courseworkItems.reduce((sum, item) => sum + item.weight, 0);
+            const courseworkRows = courseworkItems.map(itemProgress);
+            const courseworkEarned = courseworkRows.reduce((sum, row) => sum + row.earnedWeight, 0);
+            const courseworkMarked = courseworkRows.reduce((sum, row) => sum + row.markedWeight, 0);
+            const courseworkAverage = courseworkMarked > 0 ? (courseworkEarned / courseworkMarked) * 100 : null;
             const settings = gradeSettings.find((setting) => setting.course_id === course.id);
             const bands = readCutoffs(settings?.grade_cutoffs)
               .map((cutoff) => ({
@@ -758,11 +767,11 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                         Coursework
                       </span>
                       <span className="text-sm font-bold text-ink">
-                        {percent(earned)} / {percent(totalWeight)}
+                        {percent(courseworkEarned)} / {percent(courseworkWeight)}
                       </span>
-                      {markedWeight > 0 && (
+                      {courseworkMarked > 0 && (
                         <span className="text-sm font-semibold text-ink">
-                          {percent(average ?? 0)}
+                          {percent(courseworkAverage ?? 0)}
                         </span>
                       )}
                     </div>
