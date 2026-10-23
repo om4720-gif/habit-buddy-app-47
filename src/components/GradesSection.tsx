@@ -1,5 +1,16 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
+import {
+  createGradeItem,
+  deleteGradeItem,
+  getCourseGradeSettings,
+  getGradeItems,
+  saveCourseGradeSettings,
+  updateGradeItem,
+} from "@/lib/grades.functions";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -158,11 +169,67 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   const [gradeSettings, setGradeSettings] = useState<CourseGradeSettings[]>([]);
   const [importCourseId, setImportCourseId] = useState<string | null>(null);
 
+  const queryClient = useQueryClient();
+  const fetchItems = useServerFn(getGradeItems);
+  const fetchSettings = useServerFn(getCourseGradeSettings);
+  const createItemFn = useServerFn(createGradeItem);
+  const updateItemFn = useServerFn(updateGradeItem);
+  const deleteItemFn = useServerFn(deleteGradeItem);
+  const saveSettingsFn = useServerFn(saveCourseGradeSettings);
+
+  const { data: remoteItems, isPending: itemsPending } = useQuery({
+    queryKey: ["grade-items"],
+    queryFn: () => fetchItems({ data: {} }),
+  });
+  const { data: remoteSettings } = useQuery({
+    queryKey: ["grade-settings"],
+    queryFn: () => fetchSettings({ data: {} }),
+  });
+
   useEffect(() => {
+    if (!remoteItems) return;
+    setGradeItems(
+      remoteItems.map((row) => ({
+        id: row.id,
+        course_id: row.course_id,
+        title: row.title,
+        score: row.score === null ? null : Number(row.score),
+        max_score: Number(row.max_score),
+        weight: Number(row.weight),
+        is_final: row.is_final,
+        marks: Array.isArray(row.marks) ? (row.marks as unknown as GradeMark[]) : [],
+        best_count: row.best_count,
+        expected_count: row.expected_count,
+      })),
+    );
+  }, [remoteItems]);
+
+  useEffect(() => {
+    if (!remoteSettings) return;
+    setGradeSettings(
+      remoteSettings.map((row) => ({
+        course_id: row.course_id,
+        credit_hours: Number(row.credit_hours),
+        grade_cutoffs: row.grade_cutoffs as unknown as CourseGradeSettings["grade_cutoffs"],
+      })),
+    );
+  }, [remoteSettings]);
+
+  // One-time move: grades saved in this browser before the database switch are copied to the account.
+  useEffect(() => {
+    if (itemsPending || !remoteItems || remoteItems.length > 0) return;
     const saved = readLocalGrades();
-    setGradeItems(saved.items);
-    setGradeSettings(saved.settings);
-  }, []);
+    if (saved.items.length === 0 && saved.settings.length === 0) return;
+    void syncToServer([], saved.items, [], saved.settings).then(() => {
+      try {
+        localStorage.removeItem(LOCAL_GRADES_KEY);
+      } catch {
+        /* storage unavailable: nothing to clean up */
+      }
+      toast.success("Your saved grades were moved to your account.");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsPending, remoteItems]);
 
   /** Saves weights from the import dialog. Returns an error message, or null when saved. */
   function importWeights(courseId: string, rows: WeightRow[], creditHours: number | null): string | null {
@@ -207,9 +274,66 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   }
 
   function persistLocalGrades(items: GradeItem[], settings: CourseGradeSettings[]) {
-    localStorage.setItem(LOCAL_GRADES_KEY, JSON.stringify({ items, settings }));
+    const previousItems = gradeItems;
+    const previousSettings = gradeSettings;
     setGradeItems(items);
     setGradeSettings(settings);
+    void syncToServer(previousItems, items, previousSettings, settings);
+  }
+
+  /** Writes only what changed to the database, then refreshes the page from it. */
+  async function syncToServer(
+    previousItems: GradeItem[],
+    nextItems: GradeItem[],
+    previousSettings: CourseGradeSettings[],
+    nextSettings: CourseGradeSettings[],
+  ) {
+    try {
+      const nextIds = new Set(nextItems.map((item) => item.id));
+      for (const item of previousItems) {
+        if (!nextIds.has(item.id)) await deleteItemFn({ data: { gradeItemId: item.id } });
+      }
+      const previousById = new Map(previousItems.map((item) => [item.id, item]));
+      for (const item of nextItems) {
+        const payload = {
+          courseId: item.course_id,
+          title: item.title,
+          score: item.score,
+          maxScore: item.max_score,
+          weight: item.weight,
+          isFinal: item.is_final,
+          marks: (item.marks ?? []).map((mark) => ({
+            id: mark.id,
+            name: mark.name,
+            score: mark.score,
+            max_score: mark.max_score,
+            counts_for: String(mark.counts_for),
+          })),
+          bestCount: item.best_count ?? null,
+          expectedCount: item.expected_count ?? null,
+        };
+        const before = previousById.get(item.id);
+        if (!before) await createItemFn({ data: { ...payload, id: item.id } });
+        else if (JSON.stringify(before) !== JSON.stringify(item))
+          await updateItemFn({ data: { ...payload, gradeItemId: item.id } });
+      }
+      for (const setting of nextSettings) {
+        const before = previousSettings.find((s) => s.course_id === setting.course_id);
+        if (!before || JSON.stringify(before) !== JSON.stringify(setting))
+          await saveSettingsFn({
+            data: {
+              courseId: setting.course_id,
+              creditHours: setting.credit_hours,
+              gradeCutoffs: setting.grade_cutoffs,
+            },
+          });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save the grades. Try again.");
+    } finally {
+      await queryClient.invalidateQueries({ queryKey: ["grade-items"] });
+      await queryClient.invalidateQueries({ queryKey: ["grade-settings"] });
+    }
   }
 
   function updateGradeSettings(

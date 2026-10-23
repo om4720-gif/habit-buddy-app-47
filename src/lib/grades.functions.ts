@@ -5,7 +5,19 @@ import { z } from "zod";
 import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+const markSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().max(120),
+  score: z.number().min(0).nullable(),
+  max_score: z.number().positive().max(100_000),
+  counts_for: z.string().max(64),
+});
+
 const gradeItemSchema = z.object({
+  id: z.string().uuid().optional(),
+  marks: z.array(markSchema).max(50).default([]),
+  bestCount: z.number().int().min(1).max(100).nullable().optional(),
+  expectedCount: z.number().int().min(1).max(100).nullable().optional(),
   courseId: z.string().uuid(),
   title: z.string().trim().min(1).max(200),
   score: z.number().min(0).nullable(),
@@ -69,14 +81,18 @@ export const createGradeItem = createServerFn({ method: "POST" })
       data.weight,
       data.isFinal,
     );
-    const row: Database["public"]["Tables"]["course_grade_items"]["Insert"] = {
+    const row = {
+      ...(data.id ? { id: data.id } : {}),
       course_id: data.courseId,
       title: data.title,
       score: data.score,
       max_score: data.maxScore,
       weight: data.weight,
       is_final: data.isFinal,
-    };
+      marks: data.marks,
+      best_count: data.bestCount ?? null,
+      expected_count: data.expectedCount ?? null,
+    } as Database["public"]["Tables"]["course_grade_items"]["Insert"];
     const { error } = await context.supabase.from("course_grade_items").insert(row);
     if (error) throw new Error(error.message);
     return { success: true };
@@ -93,14 +109,17 @@ export const updateGradeItem = createServerFn({ method: "POST" })
       data.weight,
       data.isFinal,
     );
-    const updates: Database["public"]["Tables"]["course_grade_items"]["Update"] = {
+    const updates = {
       title: data.title,
       score: data.score,
       max_score: data.maxScore,
       weight: data.weight,
       is_final: data.isFinal,
+      marks: data.marks,
+      best_count: data.bestCount ?? null,
+      expected_count: data.expectedCount ?? null,
       updated_at: new Date().toISOString(),
-    };
+    } as Database["public"]["Tables"]["course_grade_items"]["Update"];
     const { error } = await context.supabase
       .from("course_grade_items")
       .update(updates)

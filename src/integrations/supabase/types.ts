@@ -128,10 +128,13 @@ export type Database = {
       };
       course_grade_items: {
         Row: {
+          best_count: number | null;
           course_id: string;
           created_at: string;
+          expected_count: number | null;
           id: string;
           is_final: boolean;
+          marks: Json;
           max_score: number;
           score: number | null;
           title: string;
@@ -140,10 +143,13 @@ export type Database = {
           weight: number;
         };
         Insert: {
+          best_count?: number | null;
           course_id: string;
           created_at?: string;
+          expected_count?: number | null;
           id?: string;
           is_final?: boolean;
+          marks?: Json;
           max_score?: number;
           score?: number | null;
           title: string;
@@ -152,10 +158,13 @@ export type Database = {
           weight: number;
         };
         Update: {
+          best_count?: number | null;
           course_id?: string;
           created_at?: string;
+          expected_count?: number | null;
           id?: string;
           is_final?: boolean;
+          marks?: Json;
           max_score?: number;
           score?: number | null;
           title?: string;
