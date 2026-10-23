@@ -185,9 +185,15 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   });
   const fetchInbox = useServerFn(getGradeInboxToken);
   const resetInbox = useServerFn(resetGradeInboxToken);
-  const { data: inbox, refetch: refetchInbox } = useQuery({
+  const {
+    data: inbox,
+    refetch: refetchInbox,
+    isError: inboxError,
+    error: inboxErr,
+  } = useQuery({
     queryKey: ["grade-inbox-token"],
     queryFn: () => fetchInbox(),
+    retry: false, // show the problem now instead of spinning through slow retries
   });
   const inboxLink = inbox ? `${window.location.origin}/api/public/grades?key=${inbox.token}` : "";
   const { data: remoteSettings } = useQuery({
@@ -655,6 +661,12 @@ export function GradesSection({ courses }: { courses: Course[] }) {
 
       <div className="rounded-2xl border border-line bg-card p-4">
         <p className="text-sm font-semibold text-ink">Grade inbox link</p>
+        {inboxError && (
+          <p className="mt-1 text-xs text-destructive">
+            {inboxErr instanceof Error ? inboxErr.message : "Could not load the link."} Reload the page, or check that the
+            latest database migration is applied.
+          </p>
+        )}
         <p className="mt-1 text-xs leading-relaxed text-ink-soft">
           The Chrome extension sends new GUC grades to this link. Keep it private: anyone with it can add grades to your account.
         </p>
@@ -662,7 +674,7 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           <input
             readOnly
             value={inboxLink}
-            placeholder="Loading…"
+            placeholder={inboxError ? "Could not load the link" : "Loading…"}
             aria-label="Grade inbox link"
             onFocus={(e) => e.currentTarget.select()}
             className="min-w-0 flex-1 rounded-xl border border-line bg-background px-3 py-2 text-xs text-ink"
