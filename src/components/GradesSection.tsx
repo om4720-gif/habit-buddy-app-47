@@ -3,6 +3,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { WeightsImport } from "@/components/WeightsImport";
+import { checkWeights, type WeightRow } from "@/lib/weights";
 import { Input } from "@/components/ui/input";
 type Course = { id: string; name: string; code: string | null; color: string | null };
 type GradeItem = {
@@ -154,12 +156,34 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   const [creditHours, setCreditHours] = useState("3");
   const [gradeItems, setGradeItems] = useState<GradeItem[]>([]);
   const [gradeSettings, setGradeSettings] = useState<CourseGradeSettings[]>([]);
+  const [importCourseId, setImportCourseId] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = readLocalGrades();
     setGradeItems(saved.items);
     setGradeSettings(saved.settings);
   }, []);
+
+  /** Saves weights from the import dialog. Returns an error message, or null when saved. */
+  function importWeights(courseId: string, rows: WeightRow[]): string | null {
+    const current = gradeItems.filter((item) => item.course_id === courseId);
+    const problem = checkWeights(rows, current);
+    if (problem) return problem;
+    const created: GradeItem[] = rows.map((row) => ({
+      id: crypto.randomUUID(),
+      course_id: courseId,
+      title: row.title,
+      score: null,
+      max_score: 100,
+      weight: row.weight,
+      is_final: row.isFinal,
+      marks: [],
+      best_count: null,
+      expected_count: null,
+    }));
+    persistLocalGrades([...gradeItems, ...created], gradeSettings);
+    return null;
+  }
 
   function persistLocalGrades(items: GradeItem[], settings: CourseGradeSettings[]) {
     localStorage.setItem(LOCAL_GRADES_KEY, JSON.stringify({ items, settings }));
@@ -475,25 +499,6 @@ export function GradesSection({ courses }: { courses: Course[] }) {
         </div>
       </div>
 
-      <div className="rounded-2xl bg-violet-600 px-5 py-4 text-white shadow-md">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <p className="font-display text-4xl font-semibold">
-            {gpaSoFar === null ? "—" : gpaSoFar.toFixed(2)}
-          </p>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/80">
-              GPA so far
-            </p>
-            <p className="mt-1 text-xs text-white/90">
-              {courses.length} courses · {totalCredits} credit hours
-              {gpaCourses.length
-                ? ` · ${Math.min(...gpaCourses.map((item) => item.gpaPoints ?? 5)).toFixed(1)} is the best`
-                : ""}
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className="rounded-2xl border border-line bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -576,11 +581,6 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                         <p className="text-xl font-bold text-ink">
                           {average === null ? "—" : percent(average)}
                         </p>
-                        {letter && (
-                          <p className="text-xs font-semibold text-ink-soft">
-                            {letter} · {points?.toFixed(2)}
-                          </p>
-                        )}
                       </div>
                       <Button
                         type="button"
@@ -709,6 +709,18 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                   >
                     + Add assessment
                   </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 w-full rounded-full text-ink-soft"
+                    onClick={() => {
+                      setSelectedCourseId(course.id);
+                      setImportCourseId(course.id);
+                    }}
+                  >
+                    Import weights from text or photo
+                  </Button>
                 </div>
               </article>
             );
@@ -773,124 +785,7 @@ export function GradesSection({ courses }: { courses: Course[] }) {
               {percent(totalWeight)}
             </span>
           </div>
-          <form onSubmit={handleSaveCutoffs} className="space-y-3 border-t border-line pt-4">
-            <label className="block text-sm font-medium text-ink">
-              Credit hours
-              <Input
-                required
-                type="number"
-                min={0.1}
-                max={30}
-                step="0.1"
-                value={creditHours}
-                onChange={(event) => setCreditHours(event.target.value)}
-                className="mt-1 rounded-xl border-line bg-background"
-              />
-            </label>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-ink">Letter grades and GPA</p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  setCutoffForm([
-                    ...cutoffForm,
-                    { label: "", minimum: "", gpaStart: "", gpaEnd: "" },
-                  ])
-                }
-              >
-                + Add grade
-              </Button>
-            </div>
-            {cutoffForm.map((cutoff, index) => (
-              <div
-                key={`${index}-${cutoff.label}`}
-                className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2"
-              >
-                <Input
-                  aria-label="Letter grade"
-                  value={cutoff.label}
-                  onChange={(event) =>
-                    setCutoffForm(
-                      cutoffForm.map((item, itemIndex) =>
-                        itemIndex === index ? { ...item, label: event.target.value } : item,
-                      ),
-                    )
-                  }
-                  placeholder="A+"
-                  maxLength={10}
-                  className="rounded-xl border-line bg-background"
-                />
-                <Input
-                  aria-label="Minimum percentage"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.1"
-                  value={cutoff.minimum}
-                  onChange={(event) =>
-                    setCutoffForm(
-                      cutoffForm.map((item, itemIndex) =>
-                        itemIndex === index ? { ...item, minimum: event.target.value } : item,
-                      ),
-                    )
-                  }
-                  placeholder="94"
-                  className="rounded-xl border-line bg-background"
-                />
-                <Input
-                  aria-label="GPA points"
-                  type="number"
-                  min={0}
-                  max={5}
-                  step="0.1"
-                  value={cutoff.gpaStart}
-                  onChange={(event) =>
-                    setCutoffForm(
-                      cutoffForm.map((item, itemIndex) =>
-                        itemIndex === index ? { ...item, gpaStart: event.target.value } : item,
-                      ),
-                    )
-                  }
-                  placeholder="GPA low score"
-                  className="rounded-xl border-line bg-background"
-                />
-                <Input
-                  aria-label="GPA point at maximum percentage"
-                  type="number"
-                  min={0}
-                  max={5}
-                  step="0.1"
-                  value={cutoff.gpaEnd}
-                  onChange={(event) =>
-                    setCutoffForm(
-                      cutoffForm.map((item, itemIndex) =>
-                        itemIndex === index ? { ...item, gpaEnd: event.target.value } : item,
-                      ),
-                    )
-                  }
-                  placeholder="GPA high score"
-                  className="rounded-xl border-line bg-background"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Remove ${cutoff.label || "grade"} cutoff`}
-                  disabled={cutoffForm.length <= 1}
-                  onClick={() =>
-                    setCutoffForm(cutoffForm.filter((_, itemIndex) => itemIndex !== index))
-                  }
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
-            <Button type="submit" variant="outline" className="w-full rounded-full">
-              Save grading scheme
-            </Button>
-          </form>
+
           <Button type="button" className="w-full rounded-full" onClick={openNewItem}>
             + Add assessment component
           </Button>
@@ -1189,6 +1084,19 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           </form>
         </DialogContent>
       </Dialog>
+      {importCourseId && (
+        <WeightsImport
+          open
+          onOpenChange={(open) => !open && setImportCourseId(null)}
+          courseName={courses.find((c) => c.id === importCourseId)?.name ?? "Course"}
+          existing={gradeItems.filter((item) => item.course_id === importCourseId)}
+          onImport={(rows) => {
+            const error = importWeights(importCourseId, rows);
+            if (!error) setImportCourseId(null);
+            return error;
+          }}
+        />
+      )}
     </section>
   );
 }
