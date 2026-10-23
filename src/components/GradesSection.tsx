@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  connectGradeFeed,
+  disconnectGradeFeed,
+  getGradeFeedStatus,
+  syncGradeFeedNow,
+} from "@/lib/grade-feed.functions";
+import {
   getGradeInboxToken,
   resetGradeInboxToken,
   createGradeItem,
@@ -172,6 +178,16 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   const [gradeSettings, setGradeSettings] = useState<CourseGradeSettings[]>([]);
   const [importCourseId, setImportCourseId] = useState<string | null>(null);
   const [gradeFileOpen, setGradeFileOpen] = useState(false);
+  const [feedUrl, setFeedUrl] = useState("");
+  const connectFeedFn = useServerFn(connectGradeFeed);
+  const disconnectFeedFn = useServerFn(disconnectGradeFeed);
+  const feedStatusFn = useServerFn(getGradeFeedStatus);
+  const syncFeedFn = useServerFn(syncGradeFeedNow);
+  const { data: feed, refetch: refetchFeed } = useQuery({
+    queryKey: ["grade-feed-status"],
+    queryFn: () => feedStatusFn(),
+    retry: false,
+  });
 
   const queryClient = useQueryClient();
   const fetchItems = useServerFn(getGradeItems);
@@ -659,6 +675,93 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           </p>
           <h2 className="mt-1 font-display text-2xl font-medium text-ink">Grades</h2>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-card p-4">
+        <p className="text-sm font-semibold text-ink">Connected grades link</p>
+        {feed ? (
+          <>
+            <p className="mt-1 text-xs text-ink-soft">
+              Connected to <span className="font-medium text-ink">{feed.host}</span>. Checked every 3 hours.
+              {feed.last_checked_at ? ` Last check: ${new Date(feed.last_checked_at).toLocaleString()}.` : ""}
+            </p>
+            {feed.last_status && (
+              <p className={`mt-1 text-xs ${feed.last_status.startsWith("error") ? "text-destructive" : "text-ink-soft"}`}>
+                Status: {feed.last_status}
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                className="rounded-full"
+                onClick={async () => {
+                  try {
+                    const r = await syncFeedFn();
+                    if (r.status.startsWith("error")) toast.error(r.status);
+                    else toast.success(`Checked now: ${r.updated} updated`);
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Could not check now");
+                  }
+                  await refetchFeed();
+                  await queryClient.invalidateQueries({ queryKey: ["grade-items"] });
+                }}
+              >
+                Check now
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="rounded-full"
+                onClick={async () => {
+                  if (!window.confirm("Disconnect this link? New grades will stop syncing.")) return;
+                  await disconnectFeedFn();
+                  await refetchFeed();
+                  toast.success("Disconnected");
+                }}
+              >
+                Disconnect
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+              Paste your grades link once. It's stored encrypted, checked every 3 hours, and new grades appear here and in the popup.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <input
+                value={feedUrl}
+                onChange={(e) => setFeedUrl(e.target.value)}
+                placeholder="https://…"
+                aria-label="Grades link"
+                className="min-w-0 flex-1 rounded-xl border border-line bg-background px-3 py-2 text-xs text-ink"
+              />
+              <Button
+                type="button"
+                size="sm"
+                className="rounded-full"
+                disabled={!feedUrl.trim()}
+                onClick={async () => {
+                  try {
+                    const r = await connectFeedFn({ data: { url: feedUrl.trim() } });
+                    setFeedUrl("");
+                    toast.success(`Connected to ${r.host}`);
+                    await refetchFeed();
+                    await syncFeedFn().catch(() => undefined);
+                    await refetchFeed();
+                    await queryClient.invalidateQueries({ queryKey: ["grade-items"] });
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Could not connect");
+                  }
+                }}
+              >
+                Connect
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="flex justify-end">

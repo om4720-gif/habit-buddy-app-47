@@ -232,6 +232,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      grade_feeds: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          encrypted_url: string
+          host: string
+          id: string
+          last_checked_at: string | null
+          last_status: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          encrypted_url: string
+          host: string
+          id?: string
+          last_checked_at?: string | null
+          last_status?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          encrypted_url?: string
+          host?: string
+          id?: string
+          last_checked_at?: string | null
+          last_status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       grade_notifications: {
         Row: {
           course_code: string | null;
